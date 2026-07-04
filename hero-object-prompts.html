@@ -1,0 +1,597 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Prompt Capsule Hero Object Prompts</title>
+  <style>
+    :root {
+      --bg: #f4f0e8;
+      --paper: #fffaf0;
+      --ink: #14110f;
+      --muted: #6f675d;
+      --line: #d5c9b8;
+      --red: #c71922;
+      --cyan: #20bfb0;
+      --black: #090807;
+      --code: #211d19;
+      --code-ink: #f8f2e8;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background:
+        linear-gradient(rgba(20, 17, 15, 0.035) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(20, 17, 15, 0.035) 1px, transparent 1px),
+        var(--bg);
+      background-size: 24px 24px;
+      color: var(--ink);
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      line-height: 1.62;
+    }
+
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      border-bottom: 2px solid var(--ink);
+      background: rgba(244, 240, 232, 0.94);
+      backdrop-filter: blur(10px);
+    }
+
+    .bar {
+      width: min(1180px, calc(100vw - 40px));
+      margin: 0 auto;
+      padding: 18px 0 16px;
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 20px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: baseline;
+      gap: 14px;
+      font-weight: 900;
+      letter-spacing: 0;
+    }
+
+    .brand strong {
+      font-size: 28px;
+    }
+
+    .brand span {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 15px;
+      color: var(--muted);
+    }
+
+    .status {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    main {
+      width: min(1180px, calc(100vw - 40px));
+      margin: 34px auto 80px;
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 24px;
+      margin-bottom: 26px;
+    }
+
+    .panel {
+      border: 2px solid var(--ink);
+      background: rgba(255, 250, 240, 0.9);
+      box-shadow: 8px 8px 0 var(--ink);
+      padding: 26px;
+    }
+
+    h1 {
+      margin: 0 0 12px;
+      font-size: clamp(34px, 5vw, 58px);
+      line-height: 1.05;
+      letter-spacing: 0;
+    }
+
+    h2 {
+      margin: 0 0 14px;
+      font-size: 22px;
+      line-height: 1.2;
+    }
+
+    p {
+      margin: 0 0 14px;
+      color: #2d2823;
+    }
+
+    .thesis {
+      font-size: 18px;
+      max-width: 720px;
+    }
+
+    .chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 18px;
+    }
+
+    .chip {
+      border: 1px solid var(--ink);
+      padding: 6px 10px;
+      background: #fff;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .chip.red {
+      background: var(--red);
+      color: white;
+    }
+
+    .chip.cyan {
+      background: var(--cyan);
+      color: var(--black);
+    }
+
+    .rule {
+      display: grid;
+      grid-template-columns: 110px 1fr;
+      gap: 12px;
+      padding: 9px 0;
+      border-bottom: 1px dashed var(--line);
+      font-size: 14px;
+    }
+
+    .rule b {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      color: var(--red);
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 22px;
+    }
+
+    .card {
+      border: 2px solid var(--ink);
+      background: var(--paper);
+      overflow: hidden;
+    }
+
+    .card-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      border-bottom: 2px solid var(--ink);
+      background: var(--black);
+      color: white;
+      padding: 13px 16px;
+    }
+
+    .card-head h2 {
+      margin: 0;
+      font-size: 18px;
+      letter-spacing: 0;
+    }
+
+    .tag {
+      border: 1px solid rgba(255,255,255,0.5);
+      padding: 3px 7px;
+      color: var(--cyan);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 11px;
+      white-space: nowrap;
+    }
+
+    .card-body {
+      padding: 16px;
+    }
+
+    .intent {
+      margin-bottom: 12px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    pre {
+      margin: 0;
+      padding: 16px;
+      overflow-x: auto;
+      white-space: pre-wrap;
+      border: 1px solid #3a332b;
+      background: var(--code);
+      color: var(--code-ink);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+      font-size: 13px;
+      line-height: 1.55;
+    }
+
+    .starter {
+      margin: 28px 0;
+      border: 2px solid var(--red);
+      background: #fff;
+    }
+
+    .starter .card-head {
+      background: var(--red);
+    }
+
+    footer {
+      margin-top: 28px;
+      color: var(--muted);
+      font-size: 13px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+
+    @media (max-width: 900px) {
+      .hero,
+      .grid {
+        grid-template-columns: 1fr;
+      }
+
+      .bar {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .panel {
+        box-shadow: 5px 5px 0 var(--ink);
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="bar">
+      <div class="brand">
+        <strong>提示词胶囊</strong>
+        <span>Prompt Capsule / Hero Object Prompts</span>
+      </div>
+      <div class="status">PC-7D · TEXT/PLAIN · AGENT READY</div>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="panel">
+        <h1>先找物件，再做页面。</h1>
+        <p class="thesis">这轮不让 image2 画完整 Web UI。目标是找到一个一眼能记住的 hero object：长提示词被封装成一个短期有效、可复制、可交给 agent 读取的命令物件。</p>
+        <div class="chips">
+          <span class="chip red">DO: object-first</span>
+          <span class="chip">n78.xyz/c/a8K2mQp9</span>
+          <span class="chip cyan">7D</span>
+          <span class="chip">seal / open / expire</span>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>共同约束</h2>
+        <div class="rule"><b>必须有</b><span>URL、PC-7D、TEXT/PLAIN、AGENT READY、EXPIRES 7D。</span></div>
+        <div class="rule"><b>不要做</b><span>完整网页、SaaS dashboard、真实扭蛋机、医疗包装、军工卡带。</span></div>
+        <div class="rule"><b>不能抄</b><span>Nintendo / Switch / Game Boy / Pokémon / Capsule Corp / Bandai / Persona / Splatoon 的 trade dress。</span></div>
+        <div class="rule"><b>气质</b><span>日韩 indie game、漫画网点、收藏玩具插卡、terminal command artifact。</span></div>
+      </div>
+    </section>
+
+    <section class="card starter">
+      <div class="card-head">
+        <h2>一次性探索 6 个方向的总 prompt</h2>
+        <span class="tag">START HERE</span>
+      </div>
+      <div class="card-body">
+        <p class="intent">先用这一段生成一张 exploration sheet。不要追求最终效果，先看哪个 silhouette 有 aha。</p>
+        <pre>Create a brand exploration sheet with six distinct hero-object silhouette concepts for "提示词胶囊 / Prompt Capsule".
+
+Do not design a full web page.
+Do not create a SaaS dashboard, admin panel, IDE, landing page, or product mockup.
+Do not copy any real game, anime, console, toy, or brand trade dress.
+
+Product meaning:
+A long AI prompt is sealed into a short-lived plain-text URL.
+The object should make this instantly understandable:
+long prompt -> sealed command object -> copyable URL -> agent-readable.
+
+Required visible text on every concept:
+n78.xyz/c/a8K2mQp9
+PROMPT CAPSULE
+PC-7D
+TEXT/PLAIN
+AGENT READY
+EXPIRES 7D
+
+Explore these six hero-object directions:
+1. URL ampoule: a slim transparent capsule tube with a paper URL strip inside.
+2. Command talisman: a flat manga-style sealed tag with URL as spell/code.
+3. Save-file chip: a fictional handheld-game memory chip with URL as save code.
+4. Capsule card: rounded collectible card with a transparent capsule window.
+5. Sticker cartridge: small sticker-like command label with peel corner and serial.
+6. Sealed zine insert: folded URL paper band held by a red seal sticker.
+
+Style:
+Japanese indie game culture, manga screentone, collectible toy insert, terminal command utility.
+Young, sharp, cult, premium, not cute, not corporate.
+Use warm off-white, near-black, capsule red, and tiny cyan/mint status details.
+
+Composition:
+One canvas, six labeled objects, clean comparison layout.
+Each object should have a distinct silhouette.
+Prioritize memorable shape over UI completeness.
+Make it feel like a cult AI creator tool, not a toy store.</pre>
+      </div>
+    </section>
+
+    <section class="grid">
+      <article class="card">
+        <div class="card-head">
+          <h2>1. URL Ampoule</h2>
+          <span class="tag">capsule tube</span>
+        </div>
+        <div class="card-body">
+          <p class="intent">更接近“胶囊”的字面，但避开扭蛋机。适合做 logo/hero，因为轮廓清楚。</p>
+          <pre>Create a hero object for "提示词胶囊 / Prompt Capsule".
+
+Direction:
+URL ampoule. A slim transparent capsule tube containing a folded paper URL strip.
+It should feel like a sealed command vial, not medicine and not a toy gacha ball.
+
+Object:
+- horizontal transparent capsule tube
+- one side tinted capsule red
+- the other side clear plastic
+- inside is a folded off-white command strip
+- the strip shows: n78.xyz/c/a8K2mQp9
+- small red seal sticker crosses the opening
+- tiny status inscriptions on the shell
+
+Required visible labels:
+PROMPT CAPSULE
+PC-7D
+TEXT/PLAIN
+AGENT READY
+EXPIRES 7D
+n78.xyz/c/a8K2mQp9
+
+Visual language:
+Japanese capsule toy insert + terminal command label + manga screentone.
+Premium indie utility object.
+Warm off-white background, near-black ink, capsule red, tiny cyan status light.
+
+Shape:
+Clean, iconic, horizontally readable.
+It should work as a hero image and as a small app mark.
+
+Avoid:
+medical capsule, pill bottle, syringe, gashapon machine, realistic toy ball, Nintendo/Switch/Game Boy/Pokémon/Capsule Corp references, corporate SaaS styling.</pre>
+        </div>
+      </article>
+
+      <article class="card">
+        <div class="card-head">
+          <h2>2. Command Talisman</h2>
+          <span class="tag">sealed tag</span>
+        </div>
+        <div class="card-body">
+          <p class="intent">把“封”做成核心动作。更东方、更漫画，但要防止变成符咒玄学。</p>
+          <pre>Create a hero object for "提示词胶囊 / Prompt Capsule".
+
+Direction:
+Command talisman. A flat manga-style sealed command tag where the URL is treated like a spell/code, but it must feel like an AI tool, not mysticism.
+
+Object:
+- vertical or slightly diagonal paper tag
+- clipped corners, black frame, red seal stamp
+- folded strip or layered label construction
+- URL appears as the central command code:
+  n78.xyz/c/a8K2mQp9
+- small stamps and serial metadata around it
+- subtle manga screentone and registration marks
+
+Required visible labels:
+PROMPT CAPSULE
+PC-7D
+TEXT/PLAIN
+AGENT READY
+EXPIRES 7D
+n78.xyz/c/a8K2mQp9
+
+Visual language:
+Japanese manga panel, zine print, red seal stamp, terminal command artifact.
+Sharp, cult, collectible, not fantasy.
+
+Color:
+Off-white paper, near-black ink, capsule red stamp, tiny cyan/mint status detail.
+
+Avoid:
+religious talisman literalism, occult symbols, ancient scroll, cute anime mascot, Persona exact style, Splatoon graffiti, corporate dashboard.</pre>
+        </div>
+      </article>
+
+      <article class="card">
+        <div class="card-head">
+          <h2>3. Save-file Chip</h2>
+          <span class="tag">memory item</span>
+        </div>
+        <div class="card-body">
+          <p class="intent">游戏性最强：URL 是存档码。风险是太像真实游戏卡，需要保持 fictional。</p>
+          <pre>Create a hero object for "提示词胶囊 / Prompt Capsule".
+
+Direction:
+Save-file chip. A fictional handheld-game memory chip where a prompt capsule URL is displayed as the save-file code.
+
+Object:
+- small flat chip/card, 2.5D, not a real cartridge
+- asymmetric fictional silhouette
+- tiny contacts or data marks, but no real console shape
+- central large URL:
+  n78.xyz/c/a8K2mQp9
+- metadata blocks like an inventory item:
+  TYPE TEXT/PLAIN
+  TRAIT AGENT READY
+  TTL 7D
+  SERIAL PC-7D
+
+Required visible labels:
+PROMPT CAPSULE
+PC-7D
+TEXT/PLAIN
+AGENT READY
+EXPIRES 7D
+n78.xyz/c/a8K2mQp9
+
+Visual language:
+Japanese indie game save item, roguelike inventory, terminal hardware label.
+Young, sharp, collectible, credible.
+
+Color:
+Near-black frame, off-white label, capsule red accent, cyan status LED.
+
+Avoid:
+Nintendo Switch card shape, Game Boy cartridge, PlayStation memory card, SD card realism, military cartridge, heavy grunge, fake game HUD.</pre>
+        </div>
+      </article>
+
+      <article class="card">
+        <div class="card-head">
+          <h2>4. Capsule Card</h2>
+          <span class="tag">collectible card</span>
+        </div>
+        <div class="card-body">
+          <p class="intent">最适合 Web 结果页：卡片可直接变成 UI 组件。需要避免 generic TCG。</p>
+          <pre>Create a hero object for "提示词胶囊 / Prompt Capsule".
+
+Direction:
+Capsule card. A rounded collectible command card with a transparent capsule window containing the URL strip.
+
+Object:
+- flat card with rounded capsule-like silhouette
+- transparent window across the center
+- inside the window: URL strip with n78.xyz/c/a8K2mQp9
+- red seal/sticker at one corner
+- tiny labels and status chips arranged like a collectible spec card
+- should feel like something the user has obtained after sealing a prompt
+
+Required visible labels:
+PROMPT CAPSULE
+PC-7D
+TEXT/PLAIN
+AGENT READY
+EXPIRES 7D
+n78.xyz/c/a8K2mQp9
+
+Visual language:
+Collectible toy insert card + manga utility panel + command line label.
+Premium indie object, not generic trading card.
+
+Color:
+Warm off-white, black ink, capsule red, tiny cyan/mint status accent.
+
+Avoid:
+Pokémon card, Yu-Gi-Oh card, trading-card-game frame, fantasy rarity stars, cute toy packaging, corporate SaaS card.</pre>
+        </div>
+      </article>
+
+      <article class="card">
+        <div class="card-head">
+          <h2>5. Sticker Cartridge</h2>
+          <span class="tag">peel label</span>
+        </div>
+        <div class="card-body">
+          <p class="intent">最小红书：像贴纸/标签/周边。风险是太平，需要形状和细节够强。</p>
+          <pre>Create a hero object for "提示词胶囊 / Prompt Capsule".
+
+Direction:
+Sticker cartridge. A compact peelable command sticker that contains a capsule URL and serial metadata.
+
+Object:
+- sticker-like label with a peeled corner
+- silhouette has small clipped-corner cartridge energy, but stays original
+- central URL:
+  n78.xyz/c/a8K2mQp9
+- red capsule seal mark
+- tiny barcode-like texture, but not barcode-dominant
+- manga screentone dots and registration marks
+- looks like a sticker you would place on a laptop or zine
+
+Required visible labels:
+PROMPT CAPSULE
+PC-7D
+TEXT/PLAIN
+AGENT READY
+EXPIRES 7D
+n78.xyz/c/a8K2mQp9
+
+Visual language:
+Japanese indie sticker sheet, doujin zine, terminal command label, creator-tool merch.
+Young, punchy, screenshot-worthy.
+
+Color:
+Off-white sticker stock, black ink, capsule red, tiny cyan/mint highlight.
+
+Avoid:
+shipping label, paper receipt, medicine label, boring rectangle, corporate badge, generic logo sticker.</pre>
+        </div>
+      </article>
+
+      <article class="card">
+        <div class="card-head">
+          <h2>6. Sealed Zine Insert</h2>
+          <span class="tag">folded strip</span>
+        </div>
+        <div class="card-body">
+          <p class="intent">更文化、更同人志。适合内容创作者气质，但可能不够“产品工具”。</p>
+          <pre>Create a hero object for "提示词胶囊 / Prompt Capsule".
+
+Direction:
+Sealed zine insert. A folded URL paper band held by a red seal sticker, like an insert from an underground Japanese tech zine.
+
+Object:
+- folded narrow paper band
+- red seal sticker keeps it closed
+- visible central code:
+  n78.xyz/c/a8K2mQp9
+- printed black technical markings
+- small cyan/mint status mark
+- paper texture, screentone, crop marks, serial number
+- should feel handmade but precise
+
+Required visible labels:
+PROMPT CAPSULE
+PC-7D
+TEXT/PLAIN
+AGENT READY
+EXPIRES 7D
+n78.xyz/c/a8K2mQp9
+
+Visual language:
+Doujin zine insert, manga panel, hacker zine, command note, sealed prompt strip.
+Creator culture, not enterprise.
+
+Color:
+Warm paper, black ink, red seal, tiny cyan/mint status detail.
+
+Avoid:
+receipt, legal document, scroll, religious talisman, craft stationery, luxury paper brand, generic document UI.</pre>
+        </div>
+      </article>
+    </section>
+
+    <footer>
+      Generated for Prompt Capsule hero-object exploration. Use the starter sheet first, then regenerate individual winners.
+    </footer>
+  </main>
+</body>
+</html>
