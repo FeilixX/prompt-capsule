@@ -1,13 +1,37 @@
-.DS_Store
 node_modules/
+
+# Output
+.output
+.vercel
+.netlify
+.wrangler
+/.svelte-kit
+/build
 dist/
-build/
 .next/
-.vercel/
+
+# SQLite data (DB_PATH)
+data/
+*.db
+*.db-shm
+*.db-wal
+
+# Env
 .env
 .env.*
 !.env.example
-*.log
+!.env.test
+
+# Test / cache
 coverage/
 .turbo/
 .cache/
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Vite
+vite.config.js.timestamp-*
+vite.config.ts.timestamp-*
