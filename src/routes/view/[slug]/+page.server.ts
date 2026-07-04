@@ -21,6 +21,6 @@ export const load: PageServerLoad = ({ params }) => {
 		expiresAt: raw.expires_at,
 		url,
 		display,
-		agentText: `读取 ${url} 并按里面的步骤执行。`
+		agentText: `打开这个链接，按里面的内容执行：${url}`
 	};
 };

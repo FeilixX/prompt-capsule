@@ -83,7 +83,7 @@ export function createCapsuleFromInput(
 			expires_at: capsule.expires_at,
 			delete_token: deleteToken,
 			share_text: `提示词胶囊: ${display}`,
-			agent_text: `读取 ${url} 并按里面的步骤执行。`
+			agent_text: `打开这个链接，按里面的内容执行：${url}`
 		}
 	};
 }

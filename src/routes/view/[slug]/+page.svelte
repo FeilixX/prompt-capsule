@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { PageData } from './$types';
+	import CapsuleCard from '$lib/components/CapsuleCard.svelte';
 
 	let { data }: { data: PageData } = $props();
 	let copied = $state('');
@@ -10,10 +11,19 @@
 	let viewDeleted = $state(false);
 	let delErr = $state('');
 
+	function ttlLabel(expiresAt: string): string {
+		const ms = new Date(expiresAt).getTime() - Date.now();
+		if (ms <= 0) return '0';
+		const h = ms / 3_600_000;
+		if (h >= 24) return `${Math.round(h / 24)}D`;
+		if (h >= 1) return `${Math.round(h)}H`;
+		return `${Math.max(1, Math.round(ms / 60_000))}M`;
+	}
+
 	async function copy(text: string, which: string) {
 		await navigator.clipboard.writeText(text);
 		copied = which;
-		setTimeout(() => (copied = ''), 1200);
+		setTimeout(() => (copied = ''), 1400);
 	}
 
 	async function doDelete() {
@@ -45,113 +55,193 @@
 	<meta name="robots" content="noindex" />
 </svelte:head>
 
-<main>
-	<a class="home" href="/">← 提示词胶囊</a>
-
+<main class="page">
 	{#if data.active}
-		<h1>{data.title ?? '未命名胶囊'}</h1>
-		<p class="meta">到期 {new Date(data.expiresAt).toLocaleString()} · 知道链接的人可访问</p>
-
-		<pre>{data.content}</pre>
-
-		<div class="actions">
-			<button onclick={() => copy(data.content ?? '', 'content')}>
-				{copied === 'content' ? '已复制' : '复制原文'}
-			</button>
-			<button onclick={() => copy(data.agentText, 'agent')}>
-				{copied === 'agent' ? '已复制' : '复制「给 Codex 读取」'}
-			</button>
-		</div>
-
-		<p class="raw">纯文本地址(给 agent):<code>{data.display}</code></p>
-
-		<details class="del-box">
-			<summary>删除这颗胶囊</summary>
-			{#if viewDeleted}
-				<p class="done">已删除。刷新后此页将不再可用。</p>
-			{:else}
-				<p class="hint">粘贴创建时给你的删除令牌:</p>
-				<div class="del-row">
-					<input bind:value={token} placeholder="delete token" />
-					<button class="del" onclick={doDelete} disabled={deleting || token.trim() === ''}>
-						{deleting ? '删除中...' : '确认删除'}
+		<div class="grid">
+			<div class="hero-col">
+				<CapsuleCard
+					urlText={data.display}
+					slug={data.slug}
+					title={data.title}
+					ttlLabel={ttlLabel(data.expiresAt)}
+					seal={true}
+				/>
+				<div class="hero-actions">
+					<button class="act primary" onclick={() => copy(data.agentText, 'agent')}>
+						<span class="ai">›_</span>
+						{copied === 'agent' ? '✔ 已复制，粘给 AI 就行' : '复制给 AI 用'}
+					</button>
+					<button class="act" onclick={() => copy(data.content ?? '', 'content')}>
+						{copied === 'content' ? '✔ 原文已复制' : '复制原文'}
 					</button>
 				</div>
-				{#if delErr}<p class="err">{delErr}</p>{/if}
-			{/if}
-		</details>
+				<p class="raw pc-mono">
+					纯文本地址（给 AI 读取）：<code>{data.display}</code>
+				</p>
+			</div>
+
+			<div class="body-col">
+				<div class="panel">
+					<div class="panel-head">
+						<span class="ph-title pc-mono">■ 原文内容 · PLAIN TEXT</span>
+						<span class="ph-mode pc-mono">到期 {new Date(data.expiresAt).toLocaleString()}</span>
+					</div>
+					<pre class="content pc-mono">{data.content}</pre>
+				</div>
+
+				<details class="del-box">
+					<summary class="pc-mono">删除这颗胶囊</summary>
+					{#if viewDeleted}
+						<p class="done pc-mono">✔ 已删除。刷新后此页将不再可用。</p>
+					{:else}
+						<p class="hint">粘贴创建时给你的删除口令：</p>
+						<div class="del-row">
+							<input bind:value={token} placeholder="delete token" class="pc-mono" />
+							<button class="del" onclick={doDelete} disabled={deleting || token.trim() === ''}>
+								{deleting ? '删除中…' : '确认删除'}
+							</button>
+						</div>
+						{#if delErr}<p class="err pc-mono">! {delErr}</p>{/if}
+					{/if}
+				</details>
+
+				<a class="mk-own" href="/">封一颗自己的胶囊 →</a>
+			</div>
+		</div>
 	{:else}
-		<h1>胶囊已过期或已删除</h1>
-		<p class="meta">这颗胶囊不再可用。</p>
+		<div class="expired">
+			<CapsuleCard
+				urlText={data.display}
+				slug={data.slug}
+				title={data.title}
+				ttlLabel="0"
+				tone="dead"
+			/>
+			<h1>胶囊已过期或已删除</h1>
+			<p>这颗胶囊不再可用。它的内容在到期时被清除，这正是短期封装的意义。</p>
+			<a class="mk-own" href="/">封一颗新的 →</a>
+		</div>
 	{/if}
 </main>
 
 <style>
-	main {
-		max-width: 720px;
+	.page {
+		width: min(1080px, 100%);
 		margin: 0 auto;
-		padding: 2rem 1.25rem;
-		font-family: system-ui, sans-serif;
+		padding: clamp(1.4rem, 4vw, 2.6rem) clamp(1rem, 4vw, 2.2rem) 3rem;
 	}
-	.home {
-		color: #666;
-		text-decoration: none;
-		font-size: 0.9rem;
+
+	.grid {
+		display: grid;
+		grid-template-columns: 0.92fr 1.08fr;
+		gap: clamp(1rem, 2.5vw, 1.6rem);
+		align-items: start;
 	}
-	h1 {
-		margin: 1rem 0 0.25rem;
-		font-size: 1.4rem;
+
+	.hero-col {
+		position: sticky;
+		top: 5rem;
 	}
-	.meta {
-		color: #888;
-		font-size: 0.85rem;
-		margin: 0 0 1rem;
-	}
-	pre {
-		white-space: pre-wrap;
-		word-break: break-word;
-		background: #f6f6f4;
-		border: 1px solid #e5e5e0;
-		border-radius: 8px;
-		padding: 1rem;
-		font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
-		font-size: 0.9rem;
-		line-height: 1.5;
-	}
-	.actions {
-		display: flex;
+	.hero-actions {
+		display: grid;
+		grid-template-columns: 1fr;
 		gap: 0.5rem;
-		flex-wrap: wrap;
-		margin: 1rem 0;
+		margin-top: 0.9rem;
 	}
-	button {
-		border: 1px solid #d0d0c8;
-		background: #fff;
-		border-radius: 6px;
-		padding: 0.5rem 0.9rem;
+	.act {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		gap: 0.45rem;
+		border: 2px solid var(--ink);
+		background: var(--paper-2);
+		border-radius: var(--radius);
+		padding: 0.6rem 0.8rem;
+		font-size: 0.88rem;
+		font-weight: 700;
 		cursor: pointer;
-		font-size: 0.9rem;
+		color: var(--ink);
 	}
-	button:hover {
-		background: #f0f0ec;
+	.act:hover {
+		box-shadow: var(--shadow-sm);
+	}
+	.act.primary {
+		background: var(--ink);
+		color: var(--code-ink);
+	}
+	.act .ai {
+		font-family: var(--mono);
+		color: var(--cyan);
+	}
+	.raw {
+		margin: 0.8rem 0 0;
+		font-size: 0.72rem;
+		color: var(--muted);
 	}
 	.raw code {
-		font-family: ui-monospace, monospace;
-		background: #f0f0ec;
-		padding: 0.1rem 0.4rem;
-		border-radius: 4px;
+		color: var(--ink);
+		background: var(--paper-2);
+		border: 1px solid var(--line);
+		padding: 0.12rem 0.4rem;
+		word-break: break-all;
 	}
+
+	.panel {
+		border: 2px solid var(--ink);
+		background: var(--paper);
+		box-shadow: var(--shadow);
+	}
+	.panel-head {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.75rem;
+		padding: 0.6rem 0.9rem;
+		border-bottom: 2px solid var(--ink);
+		background: var(--paper-2);
+	}
+	.ph-title {
+		font-size: 0.78rem;
+		font-weight: 800;
+		letter-spacing: 0.06em;
+	}
+	.ph-mode {
+		font-size: 0.66rem;
+		color: var(--muted);
+		letter-spacing: 0.04em;
+	}
+	.content {
+		margin: 0;
+		padding: 1rem;
+		max-height: 62vh;
+		overflow: auto;
+		white-space: pre-wrap;
+		word-break: break-word;
+		font-size: 0.84rem;
+		line-height: 1.6;
+		color: var(--ink);
+		background: var(--paper);
+	}
+
 	.del-box {
-		margin-top: 2rem;
-		font-size: 0.9rem;
+		margin-top: 1rem;
+		border: 1.5px dashed var(--line);
+		padding: 0.6rem 0.8rem;
+		font-size: 0.88rem;
 	}
 	.del-box summary {
-		color: #c0392b;
 		cursor: pointer;
+		color: var(--muted);
+		font-size: 0.74rem;
+		font-weight: 700;
+		letter-spacing: 0.04em;
+	}
+	.del-box summary:hover {
+		color: var(--red);
 	}
 	.hint {
-		color: #888;
-		font-size: 0.85rem;
+		color: var(--muted);
+		font-size: 0.78rem;
 		margin: 0.6rem 0 0.4rem;
 	}
 	.del-row {
@@ -162,32 +252,72 @@
 	.del-row input {
 		flex: 1;
 		min-width: 200px;
-		border: 1px solid #d5d5cd;
-		border-radius: 6px;
+		border: 2px solid var(--ink);
+		border-radius: var(--radius);
 		padding: 0.5rem 0.6rem;
-		font-family: ui-monospace, monospace;
-		font-size: 0.85rem;
+		font-size: 0.8rem;
+		background: var(--paper-2);
+		color: var(--ink);
 	}
 	.del {
-		background: #c0392b;
+		border: 2px solid var(--red-deep);
+		background: var(--red);
 		color: #fff;
-		border-color: #c0392b;
-	}
-	.del:hover:not(:disabled) {
-		background: #a93226;
+		border-radius: var(--radius);
+		padding: 0.5rem 0.9rem;
+		font-weight: 700;
+		cursor: pointer;
 	}
 	.del:disabled {
-		opacity: 0.4;
+		opacity: 0.45;
 		cursor: not-allowed;
 	}
 	.err {
-		color: #c0392b;
-		font-size: 0.85rem;
+		color: var(--red-deep);
+		font-size: 0.78rem;
 		margin-top: 0.4rem;
+		font-weight: 700;
 	}
 	.done {
-		color: #1a7a3a;
-		font-size: 0.9rem;
+		color: var(--cyan-ink);
+		font-size: 0.85rem;
 		margin-top: 0.5rem;
+		font-weight: 700;
+	}
+
+	.mk-own {
+		display: inline-block;
+		margin-top: 1.1rem;
+		font-weight: 700;
+		font-size: 0.9rem;
+		color: var(--red);
+		text-decoration: none;
+	}
+	.mk-own:hover {
+		text-decoration: underline;
+	}
+
+	.expired {
+		max-width: 480px;
+		margin: 2rem auto;
+		text-align: center;
+	}
+	.expired h1 {
+		margin: 1.4rem 0 0.5rem;
+		font-size: 1.4rem;
+	}
+	.expired p {
+		color: var(--ink-soft);
+		font-size: 0.92rem;
+		margin: 0;
+	}
+
+	@media (max-width: 820px) {
+		.grid {
+			grid-template-columns: 1fr;
+		}
+		.hero-col {
+			position: static;
+		}
 	}
 </style>

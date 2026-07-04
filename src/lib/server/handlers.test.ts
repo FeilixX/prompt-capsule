@@ -28,7 +28,7 @@ test('createCapsuleFromInput returns share metadata built from config', () => {
 	expect(res.share_text).toContain(res.slug);
 	// agent_text is machine-facing: it must carry a complete, directly-fetchable URL (scheme included),
 	// not the protocol-stripped display form — a weak agent can't reconstruct https:// from a bare host.
-	expect(res.agent_text).toContain('读取');
+	// (Copy wording is intentionally not asserted here — it lives in product copy, not this contract.)
 	expect(res.agent_text).toContain(res.url);
 	expect(res.agent_text).toContain('https://');
 	expect(res.expires_at).toBe(new Date(T0 + 604800 * 1000).toISOString());
