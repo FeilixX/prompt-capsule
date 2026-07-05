@@ -43,6 +43,7 @@ Every tape has two URLs:
 ## Features
 
 - **Plain text, agent-first.** `/c/{slug}` is a clean `text/plain` endpoint — no HTML, no JS, nothing to scrape.
+- **Agent-native.** A remote MCP server and an installable Skill let an agent make, read, and delete tapes on its own.
 - **Short-lived.** 1 hour / 1 day / 7 days, then auto-cleared. Not a database of forever-prompts.
 - **Delete key.** Each tape gets a one-time delete token; only the holder can kill it early.
 - **No accounts.** Anonymous create, rate-limited.
@@ -113,27 +114,31 @@ curl -X POST https://n78.xyz/api/capsules/a8K2mQp9/delete \
   -d '{"delete_token":"…"}'
 ```
 
-## MCP
+## Use it from an agent
 
-A remote [MCP](https://modelcontextprotocol.io) server is served at **`https://n78.xyz/mcp`** (Streamable HTTP, stateless). Add it to any MCP client (Claude, Cursor, …) — zero install, just the URL:
+Point an agent at Prompt Tape and it makes tapes itself, then reads or deletes them. Two ways in, same backend.
+
+### Remote MCP, zero install
+
+A remote [MCP](https://modelcontextprotocol.io) server runs at **`https://n78.xyz/mcp`** (Streamable HTTP, stateless). Add one URL to Claude, Cursor, or any MCP client:
 
 ```json
-{
-  "mcpServers": {
-    "prompt-tape": { "url": "https://n78.xyz/mcp" }
-  }
-}
+{ "mcpServers": { "prompt-tape": { "url": "https://n78.xyz/mcp" } } }
 ```
 
-Tools:
+Then ask your agent to seal a block of text into a tape, and it calls the tool.
 
 | Tool | Args | Returns |
 |------|------|---------|
 | `create_prompt_tape` | `content`, `title?`, `ttl_seconds?` | `view_url`, `raw_url`, `delete_token`, `expires_at`, `agent_text` |
-| `read_prompt_tape` | `target` (slug or URL) | the capsule text |
+| `read_prompt_tape` | `target` (slug or URL) | the tape's text |
 | `delete_prompt_tape` | `slug`, `delete_token` | `deleted` |
 
-Same contract as the HTTP API (`content` ≤ 16 KB, `ttl_seconds` ≤ 7 days). An installable Skill package that wraps this lives in [`skills/prompt-tape/`](skills/prompt-tape/) — install & usage guide at [n78.xyz/skill](https://n78.xyz/skill).
+### Skill, installable
+
+[`skills/prompt-tape/`](skills/prompt-tape/) is a `SKILL.md` bundle for platforms that install Skills. It tells an agent when to offer a tape and how to make one, with three fallbacks: the MCP tool if it has one, otherwise the bundled `client.js` over HTTP, otherwise a nudge to the site. Upload the folder wherever your platform takes Skills.
+
+Both share the HTTP API contract: `content` up to 16 KB, `ttl_seconds` up to 7 days. Full walkthrough at [n78.xyz/skill](https://n78.xyz/skill).
 
 ## Configuration
 

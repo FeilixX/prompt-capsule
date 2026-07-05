@@ -43,6 +43,7 @@
 ## 特性
 
 - **纯文本，机器优先。** `/c/{slug}` 是干净的 `text/plain` 端点 —— 没 HTML、没 JS、没得爬。
+- **agent 原生。** 一个远程 MCP 服务 + 一个可安装 Skill，让 agent 能自己创建、读、删卡带。
 - **短命。** 1 小时 / 1 天 / 7 天，到点自动清空。不是一个存到天荒地老的提示词库。
 - **删除口令。** 每盘卡带一枚一次性删除口令；只有握着它的人能提前删掉。
 - **不用注册。** 匿名创建，带限流。
@@ -114,19 +115,19 @@ curl -X POST https://n78.xyz/api/capsules/a8K2mQp9/delete \
   -d '{"delete_token":"…"}'
 ```
 
-## 用 MCP 接入
+## 给 agent 用
 
-远程 [MCP](https://modelcontextprotocol.io) 服务挂在 **`https://n78.xyz/mcp`**(Streamable HTTP,无状态)。任何 MCP 客户端(Claude、Cursor 等)填一个 URL 即用,零安装：
+把 agent 接上 Prompt Tape，它能自己创建卡带，再读、再删。两条路，同一个后端。
+
+### 远程 MCP，零安装
+
+远程 [MCP](https://modelcontextprotocol.io) 服务挂在 **`https://n78.xyz/mcp`**(Streamable HTTP，无状态)。给 Claude、Cursor 或任何 MCP 客户端填一个 URL：
 
 ```json
-{
-  "mcpServers": {
-    "prompt-tape": { "url": "https://n78.xyz/mcp" }
-  }
-}
+{ "mcpServers": { "prompt-tape": { "url": "https://n78.xyz/mcp" } } }
 ```
 
-工具：
+然后让 agent 把一段文本封成卡带，它就调工具。
 
 | 工具 | 参数 | 返回 |
 |------|------|------|
@@ -134,7 +135,11 @@ curl -X POST https://n78.xyz/api/capsules/a8K2mQp9/delete \
 | `read_prompt_tape` | `target`(slug 或 URL) | 卡带正文 |
 | `delete_prompt_tape` | `slug`、`delete_token` | `deleted` |
 
-契约与 HTTP API 一致(`content` ≤ 16 KB,`ttl_seconds` ≤ 7 天)。封装成可安装 Skill 的包在 [`skills/prompt-tape/`](skills/prompt-tape/),安装与用法见 [n78.xyz/skill](https://n78.xyz/skill)。
+### Skill，可安装
+
+[`skills/prompt-tape/`](skills/prompt-tape/) 是个 `SKILL.md` 包，给支持安装 Skill 的平台用。它教 agent 什么时候提议做卡带、怎么做，带三层兜底：有 MCP 工具就调，没有就用自带 `client.js` 打 HTTP，再不行就把用户引到站点。你的平台能装 Skill，就把这个文件夹传上去。
+
+两条都走 HTTP API 那套契约：`content` 上限 16 KB，`ttl_seconds` 上限 7 天。完整走一遍：[n78.xyz/skill](https://n78.xyz/skill)。
 
 ## 配置
 
