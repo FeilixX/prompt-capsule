@@ -2,12 +2,12 @@ import type { RequestHandler } from './$types';
 import { getDb, config } from '$lib/server/db';
 import { createCapsuleFromInput } from '$lib/server/handlers';
 import { checkRateLimit } from '$lib/server/rateLimit';
+import { CREATE_RATE } from '$lib/server/limits';
 
 // v1 abuse guard: 10 creates per minute per client IP (single-node, in-memory).
-const RATE = { windowMs: 60_000, max: 10 };
-
+// Shared bucket with MCP create_prompt_tape via CREATE_RATE (key `create:{ip}`).
 export const POST: RequestHandler = async ({ request, getClientAddress }) => {
-	const rl = checkRateLimit(`create:${getClientAddress()}`, Date.now(), RATE);
+	const rl = checkRateLimit(`create:${getClientAddress()}`, Date.now(), CREATE_RATE);
 	if (!rl.allowed) {
 		return Response.json({ error: 'rate limited, slow down' }, { status: 429 });
 	}
