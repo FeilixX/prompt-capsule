@@ -47,6 +47,7 @@ const ZH: Dict = {
 	// nav / chrome
 	nav_rules: '内容须知',
 	nav_lang: 'EN',
+	nav_source: '源码在 GitHub',
 	policy_title: '内容须知',
 	policy_body:
 		'别录违法、侵权、色情、暴力、赌博、诈骗、仇恨或用来害人的东西。发现一律删，情节严重的报给相关部门。你录的、你分享的，责任你自己担。',
@@ -88,8 +89,8 @@ const ZH: Dict = {
 	// features
 	feat1_h: '我们不看',
 	feat1_p: '加密存着，不读内容，也不拿去训练。',
-	feat2_h: '传得稳',
-	feat2_p: '全程 HTTPS，不掉链子。',
+	feat2_h: '开源可查',
+	feat2_p: '代码全在 GitHub —— 不信我们？自己读，自己跑一份。',
 	feat3_h: '到点就没',
 	feat3_p: '1 小时、1 天还是 7 天你定，到点自己清空。',
 	feat4_h: 'AI 拿了就用',
@@ -145,6 +146,7 @@ const ZH: Dict = {
 const EN: Dict = {
 	nav_rules: 'House rules',
 	nav_lang: '中',
+	nav_source: 'Source on GitHub',
 	policy_title: 'House rules',
 	policy_body:
 		"Don't seal anything illegal, stolen, sexual, violent, hateful, or built to scam or hurt people. We delete violations on sight and report the serious ones. What you record and share is on you.",
@@ -182,8 +184,8 @@ const EN: Dict = {
 
 	feat1_h: "We don't read it",
 	feat1_p: "Encrypted at rest. We don't read it or train on it.",
-	feat2_h: 'Solid pipes',
-	feat2_p: 'HTTPS end to end. It just works.',
+	feat2_h: 'Open source',
+	feat2_p: "It's all on GitHub. Don't trust us? Read the code, or self-host.",
 	feat3_h: 'Gone on time',
 	feat3_p: '1 hour, 1 day, or 7 days — you pick, it clears itself.',
 	feat4_h: 'Made for agents',

@@ -63,6 +63,16 @@
 			<button class="lang-btn px" onclick={toggleLang} aria-label="切换语言 / Switch language">
 				{t('nav_lang')}
 			</button>
+			<a
+				class="gh-link"
+				href="https://github.com/FeilixX/prompt-capsule"
+				target="_blank"
+				rel="noopener noreferrer"
+				aria-label="GitHub — {t('nav_source')}"
+				title={t('nav_source')}
+			>
+				<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 .5C5.7.5.5 5.8.5 12.3c0 5.2 3.4 9.6 8 11.2.6.1.8-.3.8-.6v-2c-3.3.7-4-1.6-4-1.6-.5-1.4-1.3-1.8-1.3-1.8-1.1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1.1 1.9 2.9 1.3 3.6 1 .1-.8.4-1.3.8-1.6-2.7-.3-5.5-1.3-5.5-5.9 0-1.3.5-2.4 1.2-3.2-.1-.3-.5-1.5.1-3.2 0 0 1-.3 3.3 1.2a11.4 11.4 0 0 1 6 0C17 4.6 18 4.9 18 4.9c.6 1.7.2 2.9.1 3.2.8.8 1.2 1.9 1.2 3.2 0 4.6-2.8 5.6-5.5 5.9.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6 4.6-1.6 8-6 8-11.2C23.5 5.8 18.3.5 12 .5z"/></svg>
+			</a>
 			<button
 				class="notice-btn"
 				aria-expanded={showPolicy}
@@ -218,6 +228,31 @@
 		filter: brightness(1.03);
 	}
 	.lang-btn:active {
+		transform: translateY(2px);
+		box-shadow: none;
+	}
+
+	.gh-link {
+		display: grid;
+		place-items: center;
+		width: 32px;
+		height: 32px;
+		flex: none;
+		border: 2px solid var(--ink);
+		border-radius: var(--radius-sm);
+		background: var(--cream-lit);
+		color: var(--ink);
+		box-shadow: 0 2px 0 var(--ink);
+	}
+	.gh-link svg {
+		width: 18px;
+		height: 18px;
+		display: block;
+	}
+	.gh-link:hover {
+		filter: brightness(1.03);
+	}
+	.gh-link:active {
 		transform: translateY(2px);
 		box-shadow: none;
 	}

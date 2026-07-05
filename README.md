@@ -8,6 +8,10 @@
 
 Copy one link, hand it to your AI — it opens the link and runs. Short-lived by design.
 
+### ▶ [Try it live — **n78.xyz**](https://n78.xyz)
+
+**English** · [简体中文](README.zh-CN.md)
+
 [![license](https://img.shields.io/badge/license-MIT-1c1a17)](LICENSE)
 [![SvelteKit](https://img.shields.io/badge/SvelteKit-5-FF3E00?logo=svelte&logoColor=white)](https://svelte.dev/)
 [![Bun](https://img.shields.io/badge/Bun-runtime-14151a?logo=bun&logoColor=white)](https://bun.sh/)
