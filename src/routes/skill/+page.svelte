@@ -1,5 +1,7 @@
 <script lang="ts">
-	// 接入 & 使用指南:通用 Skill + 远程 MCP。中文主,latin 标签用像素字。
+	import { t } from '$lib/i18n.svelte';
+
+	// 接入 & 使用指南:通用 Skill + 远程 MCP。i18n via t()。
 	const MCP_URL = 'https://n78.xyz/mcp';
 	const MCP_CONFIG = `{
   "mcpServers": {
@@ -20,65 +22,60 @@
 		}
 	}
 
-	const tools = [
+	// $derived so the t() lookups recompute when the locale flips.
+	const tools = $derived([
 		{
 			name: 'create_prompt_tape',
 			args: 'content · title? · ttl_seconds?',
 			ret: 'view_url · raw_url · delete_token · expires_at · agent_text'
 		},
-		{ name: 'read_prompt_tape', args: 'target(slug 或 URL)', ret: '卡带正文' },
+		{ name: 'read_prompt_tape', args: t('sk_read_args'), ret: t('sk_read_ret') },
 		{ name: 'delete_prompt_tape', args: 'slug · delete_token', ret: 'deleted' }
-	];
+	]);
 </script>
 
 <svelte:head>
-	<title>接入 & 使用 · 提示词卡带</title>
-	<meta name="description" content="提示词卡带 Skill + 远程 MCP 的安装与使用:把提示词封成一次性 URL,任何 agent 能直接 fetch。" />
+	<title>{t('sk_title')}</title>
+	<meta name="description" content={t('sk_meta')} />
 </svelte:head>
 
 <main class="page">
 	<header class="head">
-		<p class="eyebrow px">USING · 接入指南</p>
-		<h1>把提示词<span class="hl">封成卡带</span>,给任何 agent 用</h1>
-		<p class="lede">
-			提示词卡带 = 把一段提示词 / system prompt / 长指令封成一次性 URL。链接 <code>/c/{'{slug}'}</code>
-			以纯文本返回,任何 agent 直接 fetch 就能照着执行;人也能看。有效期最长 7 天,带删除口令。
-		</p>
+		<p class="eyebrow px">{t('sk_eyebrow')}</p>
+		<h1>{t('sk_h1a')}<span class="hl">{t('sk_h1hl')}</span>{t('sk_h1b')}</h1>
+		<p class="lede">{t('sk_lede_a')}<code>/c/{'{slug}'}</code>{t('sk_lede_b')}</p>
 		<div class="chips">
-			<span class="px-chip is-teal"><span class="px-dot"></span>MCP · n78.xyz/mcp</span>
-			<span class="px-chip is-teal"><span class="px-dot"></span>HTTP API 已上线</span>
-			<span class="px-chip is-yellow">开源 · MIT</span>
+			<span class="px-chip is-teal"><span class="px-dot"></span>{t('sk_chip_live')}</span>
+			<span class="px-chip is-yellow">{t('sk_chip_oss')}</span>
 		</div>
 	</header>
 
 	<section>
-		<p class="kicker px">01 · 一分钟理解</p>
-		<h2>你有一段好东西,封进卡带,给出去。</h2>
+		<p class="kicker px">{t('sk_k1')}</p>
+		<h2>{t('sk_h2_1')}</h2>
 		<div class="flow">
-			<div class="step px-panel"><b>一段提示词</b><span>你调好的 prompt / 长指令</span></div>
+			<div class="step px-panel"><b>{t('sk_flow1_b')}</b><span>{t('sk_flow1_s')}</span></div>
 			<span class="arrow px" aria-hidden="true">▶</span>
-			<div class="step px-panel"><b>封成卡带</b><span>create_prompt_tape</span></div>
+			<div class="step px-panel"><b>{t('sk_flow2_b')}</b><span class="mono">create_prompt_tape</span></div>
 			<span class="arrow px" aria-hidden="true">▶</span>
-			<div class="step px-panel"><b>一个链接</b><span class="mono">n78.xyz/c/…</span></div>
+			<div class="step px-panel"><b>{t('sk_flow3_b')}</b><span class="mono">n78.xyz/c/…</span></div>
 		</div>
-		<p class="note">
-			链接两副面孔:<code>/c/{'{slug}'}</code> 纯文本给 agent fetch,<code>/view/{'{slug}'}</code> 给人看。到期或用删除口令销毁后即失效。
-		</p>
+		<p class="note">{t('sk_note1')}</p>
 	</section>
 
 	<section>
-		<p class="kicker px">02 · 三种接入方式</p>
-		<h2>按你手上有什么,选一种。</h2>
+		<p class="kicker px">{t('sk_k2')}</p>
+		<h2>{t('sk_h2_2')}</h2>
 
 		<div class="card px-panel">
 			<div class="card-head">
-				<h3>远程 MCP</h3>
-				<span class="px-chip is-teal">推荐 · 零安装</span>
+				<h3>{t('sk_c1_title')}</h3>
+				<span class="px-chip is-teal">{t('sk_c1_chip')}</span>
 			</div>
-			<p>把这个端点加进任何 MCP 客户端(Claude、Cursor 等),填一个 URL 就行。之后直接对 agent 说「把这段封成卡带」,它会调工具、返回链接。</p>
+			<p>{t('sk_c1_body')}</p>
 			<div class="code-wrap">
-				<button class="copy px" onclick={copyConfig} aria-label="复制配置">{copied ? '已复制 ✓' : 'COPY'}</button>
-				<pre><code><span class="c">// Claude / Cursor 的 mcp 配置</span>
+				<button class="copy px" onclick={copyConfig} aria-label="copy">{copied ? '✓' : 'COPY'}</button>
+				<pre><code><span class="c">{t('sk_c1_comment')}</span>
 {'{'}
   <span class="k">"mcpServers"</span>: {'{'}
     <span class="k">"prompt-tape"</span>: {'{'} <span class="k">"url"</span>: <span class="s">"{MCP_URL}"</span> {'}'}
@@ -89,33 +86,32 @@
 
 		<div class="card px-panel">
 			<div class="card-head">
-				<h3>HTTP API</h3>
-				<span class="px-chip is-red">已上线</span>
+				<h3>{t('sk_c2_title')}</h3>
+				<span class="px-chip is-red">{t('sk_c2_chip')}</span>
 			</div>
-			<p>不想接 MCP,直接打接口。一条 <code>POST</code> 建好,返回里 <code>url</code> 给 agent、<code>view_url</code> 给人、<code>agent_text</code> 是现成话术。</p>
+			<p>{t('sk_c2_body')}</p>
 			<pre><code><span class="k">curl</span> -X POST https://n78.xyz/api/capsules \
   -H <span class="s">'content-type: application/json'</span> \
-  -d <span class="s">'{'{'}"content":"帮我审查当前 repo 并输出诊断","source":"api"{'}'}'</span></code></pre>
+  -d <span class="s">'{'{'}"content":"{t('sk_c2_content')}","source":"api"{'}'}'</span></code></pre>
 		</div>
 
 		<div class="card px-panel">
 			<div class="card-head">
-				<h3>Skill 包</h3>
+				<h3>{t('sk_c3_title')}</h3>
 				<span class="px-chip is-yellow mono">skills/prompt-tape</span>
 			</div>
 			<p>
-				一个 <code>SKILL.md</code> 教 agent 三层降级:能调 MCP 就调;不能就用自带 <code>client.js</code> 打 HTTP;再不行就引导用户来 n78.xyz 手动封 + 出一段分享文案。装进支持 skill 的 agent 平台即可,源码在
-				<a href="https://github.com/FeilixX/prompt-capsule" target="_blank" rel="noopener noreferrer">仓库 skills/prompt-tape/</a>。
+				{t('sk_c3_body')}<a href="https://github.com/FeilixX/prompt-capsule" target="_blank" rel="noopener noreferrer">{t('sk_c3_link')}</a>。
 			</p>
 		</div>
 	</section>
 
 	<section>
-		<p class="kicker px">03 · 三个工具</p>
-		<h2>MCP 端点暴露的动作。</h2>
+		<p class="kicker px">{t('sk_k3')}</p>
+		<h2>{t('sk_h2_3')}</h2>
 		<div class="tbl-wrap px-panel">
 			<table>
-				<thead><tr><th>工具</th><th>参数</th><th>返回</th></tr></thead>
+				<thead><tr><th>{t('sk_th_tool')}</th><th>{t('sk_th_args')}</th><th>{t('sk_th_ret')}</th></tr></thead>
 				<tbody>
 					{#each tools as tool (tool.name)}
 						<tr>
@@ -130,38 +126,38 @@
 	</section>
 
 	<section>
-		<p class="kicker px">04 · 一个完整例子</p>
-		<h2>建 → 分享 / 让下游 fetch → 删。</h2>
-		<pre class="wide"><code><span class="c">// 1. agent 调 create,返回:</span>
+		<p class="kicker px">{t('sk_k4')}</p>
+		<h2>{t('sk_h2_4')}</h2>
+		<pre class="wide"><code><span class="c">{t('sk_ex_c1')}</span>
 {'{'}
-  <span class="k">"view_url"</span>:    <span class="s">"https://n78.xyz/view/okIdDdhU"</span>,  <span class="c">// 给人看</span>
-  <span class="k">"raw_url"</span>:     <span class="s">"https://n78.xyz/c/okIdDdhU"</span>,     <span class="c">// 给 agent fetch</span>
-  <span class="k">"delete_token"</span>: <span class="s">"…"</span>,                            <span class="c">// 私藏,别公开</span>
-  <span class="k">"agent_text"</span>:  <span class="s">"打开这个链接，按里面的内容执行：https://n78.xyz/c/okIdDdhU"</span>
+  <span class="k">"view_url"</span>:    <span class="s">"https://n78.xyz/view/okIdDdhU"</span>,  <span class="c">{t('sk_ex_human')}</span>
+  <span class="k">"raw_url"</span>:     <span class="s">"https://n78.xyz/c/okIdDdhU"</span>,     <span class="c">{t('sk_ex_agent')}</span>
+  <span class="k">"delete_token"</span>: <span class="s">"…"</span>,                            <span class="c">{t('sk_ex_private')}</span>
+  <span class="k">"agent_text"</span>:  <span class="s">"… https://n78.xyz/c/okIdDdhU"</span>
 {'}'}
 
-<span class="c">// 2. 下游 agent 直接 fetch raw_url,拿纯文本正文照做</span>
+<span class="c">{t('sk_ex_c2')}</span>
 <span class="k">curl</span> https://n78.xyz/c/okIdDdhU
 
-<span class="c">// 3. 不想留了,用口令删</span>
+<span class="c">{t('sk_ex_c3')}</span>
 <span class="k">curl</span> -X POST https://n78.xyz/api/capsules/okIdDdhU/delete \
   -d <span class="s">'{'{'}"delete_token":"…"{'}'}'</span></code></pre>
 	</section>
 
 	<section>
-		<p class="kicker px">05 · 约束</p>
-		<h2>几条别踩的线。</h2>
+		<p class="kicker px">{t('sk_k5')}</p>
+		<h2>{t('sk_h2_5')}</h2>
 		<ul class="notes">
-			<li><b>正文 ≤ 16KB。</b>超了会 <code>413</code>。卡带装提示词,不装文件。</li>
-			<li><b>有效期 ≤ 7 天</b>(默认 7 天,可传 <code>ttl_seconds</code> 调短),到期自动失效。</li>
-			<li><b>删除口令私藏。</b>别贴进公开分享文案 —— 谁拿到谁能删。</li>
-			<li><b>创建限流 10 次/分</b>(每 IP)。正常用够。</li>
-			<li><b>公开匿名</b>:没有账户、没有登录。卡带临时、公开、可 fetch。</li>
+			<li><b>{t('sk_lim1_b')}</b>{t('sk_lim1')}</li>
+			<li><b>{t('sk_lim2_b')}</b>{t('sk_lim2')}</li>
+			<li><b>{t('sk_lim3_b')}</b>{t('sk_lim3')}</li>
+			<li><b>{t('sk_lim4_b')}</b>{t('sk_lim4')}</li>
+			<li><b>{t('sk_lim5_b')}</b>{t('sk_lim5')}</li>
 		</ul>
 	</section>
 
 	<div class="cta">
-		<a class="px-btn is-teal" href="/">去建一个卡带 <span class="px-sub">TRY IT</span></a>
+		<a class="px-btn is-teal" href="/">{t('sk_cta')} <span class="px-sub">TRY IT</span></a>
 	</div>
 </main>
 
@@ -303,7 +299,7 @@
 		margin-bottom: 0;
 	}
 
-	/* code blocks — dark ink panel, cream text (matches footer world) */
+	/* code blocks — dark ink panel, cream text */
 	.code-wrap {
 		position: relative;
 	}

@@ -57,6 +57,7 @@
 		</a>
 
 		<div class="top-right">
+			<a class="skill-link px" href="/skill">{t('nav_skill')}</a>
 			<div class="status px">
 				<span>TEXT/PLAIN</span><i>·</i><span class="ok"><span class="px-dot"></span>AGENT&nbsp;READY</span>
 			</div>
@@ -228,6 +229,27 @@
 		filter: brightness(1.03);
 	}
 	.lang-btn:active {
+		transform: translateY(2px);
+		box-shadow: none;
+	}
+
+	.skill-link {
+		border: 2px solid var(--ink);
+		border-radius: var(--radius-sm);
+		background: var(--cream-lit);
+		color: var(--teal-deep);
+		font-size: 0.74rem;
+		font-weight: 700;
+		letter-spacing: 0.06em;
+		padding: 0.3rem 0.6rem;
+		text-decoration: none;
+		white-space: nowrap;
+		box-shadow: 0 2px 0 var(--ink);
+	}
+	.skill-link:hover {
+		filter: brightness(1.03);
+	}
+	.skill-link:active {
 		transform: translateY(2px);
 		box-shadow: none;
 	}
