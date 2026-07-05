@@ -69,5 +69,49 @@ const bigRes = await fetch(`${BASE}/api/capsules`, {
 });
 check('oversize content → 413', bigRes.status === 413, `status=${bigRes.status}`);
 
+// 7) MCP endpoint (/mcp) — route-level coverage (E1/A6: route tested via smoke,
+// not bun test, since bun can't resolve SvelteKit $lib/$app aliases). Full
+// lifecycle so the initialize handshake + protocol version are exercised (C6).
+async function mcpRpc(method: string, params: unknown, id = 1) {
+	const res = await fetch(`${BASE}/mcp`, {
+		method: 'POST',
+		headers: {
+			'Content-Type': 'application/json',
+			Accept: 'application/json, text/event-stream',
+			'MCP-Protocol-Version': '2025-06-18'
+		},
+		body: JSON.stringify({ jsonrpc: '2.0', id, method, params })
+	});
+	return { status: res.status, body: res.status < 400 ? await res.json() : await res.text() };
+}
+const mInit = await mcpRpc('initialize', {
+	protocolVersion: '2025-06-18',
+	capabilities: {},
+	clientInfo: { name: 'smoke', version: '1' }
+});
+check('MCP initialize → protocolVersion 2025-06-18', mInit.body?.result?.protocolVersion === '2025-06-18');
+const mList = await mcpRpc('tools/list', {}, 2);
+check('MCP tools/list → 3 tools', (mList.body?.result?.tools ?? []).length === 3);
+const mCreate = await mcpRpc(
+	'tools/call',
+	{ name: 'create_prompt_tape', arguments: { content: 'mcp smoke ' + Date.now() } },
+	3
+);
+const mSc = mCreate.body?.result?.structuredContent;
+check('MCP create → structuredContent + agent_text', !!mSc?.raw_url && typeof mSc?.agent_text === 'string');
+const mSlug = String(mSc?.raw_url ?? '').split('/').pop() ?? '';
+const mText = await fetch(`${BASE}/c/${mSlug}`);
+check('MCP-created capsule fetchable at /c/{slug}', mText.status === 200, `status=${mText.status}`);
+const mDel = await mcpRpc(
+	'tools/call',
+	{ name: 'delete_prompt_tape', arguments: { slug: mSlug, delete_token: mSc?.delete_token } },
+	4
+);
+check('MCP delete → not error', mDel.body?.result?.isError !== true);
+const mGone = await mcpRpc('tools/call', { name: 'read_prompt_tape', arguments: { target: mSlug } }, 5);
+check('MCP read after delete → gone', mGone.body?.result?.structuredContent?.error?.code === 'gone');
+const mGet = await fetch(`${BASE}/mcp`);
+check('GET /mcp → 405', mGet.status === 405, `status=${mGet.status}`);
+
 console.log(failures === 0 ? '\nALL GREEN' : `\n${failures} FAILURES`);
 process.exit(failures === 0 ? 0 : 1);
