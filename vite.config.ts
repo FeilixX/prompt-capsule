@@ -17,6 +17,9 @@ export default defineConfig({
 	],
 	// bun:sqlite (and any bun: builtin) is a Bun runtime module — never bundle it.
 	// Left external so Bun resolves it at runtime (dev, build, and prod all run under Bun).
-	ssr: { external: ['bun:sqlite'] },
+	// @modelcontextprotocol/server is force-bundled (noExternal) so build/ is
+	// self-contained — the prod deploy only rsyncs build/ (no server-side install),
+	// and the server's node_modules doesn't carry this dep.
+	ssr: { external: ['bun:sqlite'], noExternal: ['@modelcontextprotocol/server'] },
 	build: { rollupOptions: { external: [/^bun:/] } }
 });
