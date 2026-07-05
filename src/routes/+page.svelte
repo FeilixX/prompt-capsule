@@ -1,6 +1,5 @@
 <script lang="ts">
-	import CapsuleCard from '$lib/components/CapsuleCard.svelte';
-	import Confetti from '$lib/components/Confetti.svelte';
+	import { t } from '$lib/i18n.svelte';
 
 	interface CreateResponse {
 		slug: string;
@@ -19,13 +18,7 @@
 	let errorMsg = $state('');
 	let result = $state<CreateResponse | null>(null);
 	let copied = $state('');
-
-	// seal animation
-	let sealing = $state(false);
-	let compBytes = $state(0);
-	let displayUrl = $state('');
-	let sealAnim = $state(false);
-	let confettiKey = $state(0);
+	let modalOpen = $state(false);
 
 	// delete flow (uses the just-issued token in hand)
 	let confirmingDelete = $state(false);
@@ -33,61 +26,36 @@
 	let deleted = $state(false);
 	let deleteErr = $state('');
 
+	// Show characters (humans think in 字/chars, not bytes). The server cap is
+	// 16 KB; 5,000 chars always fits (even all-CJK ≈ 15 KB), so the char count is
+	// the honest ceiling and the byte check below is just a silent backstop.
+	const chars = $derived([...content].length);
+	const MAX_CHARS = 5000;
 	const bytes = $derived(new TextEncoder().encode(content).length);
 	const MAX_BYTES = 16384;
-	const SLUG_LEN = 8;
+	const overLimit = $derived(chars > MAX_CHARS || bytes > MAX_BYTES);
 
-	const ttlLabel = $derived(ttl === 3600 ? '1H' : ttl === 86400 ? '24H' : '7D');
-	const ttlText = $derived(ttl === 3600 ? '1 小时' : ttl === 86400 ? '1 天' : '7 天');
-	const expiresText = $derived(
-		result ? new Date(result.expires_at).toLocaleString() : ''
+	const ttlLabel = $derived(ttl === 3600 ? t('seg_1h') : ttl === 86400 ? t('seg_1d') : t('seg_7d'));
+	const ttlChip = $derived(ttl === 3600 ? '1H' : ttl === 86400 ? '1D' : '7D');
+	const expiresText = $derived(result ? new Date(result.expires_at).toLocaleString() : '');
+	const display = $derived(result ? result.url.replace(/^https?:\/\//, '') : '');
+	const headerText = $derived(
+		deleted ? t('m_head_del') : errorMsg ? t('m_head_err') : busy ? t('m_head_rec') : t('m_head_done')
 	);
 
 	const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-	function animateCompression(from: number) {
-		const start = performance.now();
-		const dur = 780;
-		compBytes = from;
-		function tick(now: number) {
-			const t = Math.min(1, (now - start) / dur);
-			const eased = 1 - Math.pow(1 - t, 3);
-			compBytes = Math.max(SLUG_LEN, Math.round(from - (from - SLUG_LEN) * eased));
-			if (t < 1 && sealing) requestAnimationFrame(tick);
-		}
-		requestAnimationFrame(tick);
-	}
-
-	function runScramble(slug: string) {
-		const prefix = 'n78.xyz/c/';
-		const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
-		const steps = 14;
-		let step = 0;
-		displayUrl = prefix + slug;
-		const id = setInterval(() => {
-			step++;
-			const locked = Math.floor((step / steps) * slug.length);
-			let tail = '';
-			for (let i = 0; i < slug.length; i++) {
-				tail += i < locked ? slug[i] : chars[(Math.random() * chars.length) | 0];
-			}
-			displayUrl = prefix + tail;
-			if (step >= steps) {
-				clearInterval(id);
-				displayUrl = prefix + slug;
-			}
-		}, 34);
-	}
-
-	async function seal() {
-		if (busy || content.trim() === '' || bytes > MAX_BYTES) return;
+	async function record() {
+		if (busy || content.trim() === '' || overLimit) return;
+		// pop the sheet immediately in its recording state, THEN talk to the server
 		busy = true;
 		errorMsg = '';
-		sealing = true;
-		sealAnim = false;
-		animateCompression(bytes);
+		result = null;
+		deleted = false;
+		confirmingDelete = false;
+		deleteErr = '';
+		modalOpen = true;
 		const started = performance.now();
-
 		try {
 			const res = await fetch('/api/capsules', {
 				method: 'POST',
@@ -100,25 +68,24 @@
 				})
 			});
 			const data = await res.json();
+			// keep the reels turning for a beat so "recording" reads as a real action
 			const elapsed = performance.now() - started;
-			if (elapsed < 900) await delay(900 - elapsed);
-
+			if (elapsed < 650) await delay(650 - elapsed);
 			if (!res.ok) {
-				errorMsg = data.error ?? '生成失败';
-				sealing = false;
+				errorMsg = data.error ?? t('m_err_generic');
 				return;
 			}
 			result = data as CreateResponse;
-			sealing = false;
-			sealAnim = true;
-			runScramble(result.slug);
-			confettiKey++;
 		} catch {
-			errorMsg = '网络错误';
-			sealing = false;
+			errorMsg = t('m_err_generic');
 		} finally {
 			busy = false;
 		}
+	}
+
+	function retry() {
+		errorMsg = '';
+		record();
 	}
 
 	async function copy(text: string, which: string) {
@@ -141,659 +108,758 @@
 				deleted = true;
 			} else {
 				const data = await res.json();
-				deleteErr = data.error ?? '删除失败';
+				deleteErr = data.message ?? data.error ?? t('v_del_fail');
 			}
 		} catch {
-			deleteErr = '网络错误';
+			deleteErr = t('v_net_err');
 		} finally {
 			deleting = false;
 			confirmingDelete = false;
 		}
 	}
 
+	// the sheet only closes on ✕ (never on a backdrop misclick — the delete key
+	// shows once and is easy to lose). Closing wipes back to a fresh form.
 	function reset() {
+		modalOpen = false;
 		result = null;
 		content = '';
 		title = '';
 		deleted = false;
 		confirmingDelete = false;
 		deleteErr = '';
-		sealAnim = false;
-		displayUrl = '';
+		errorMsg = '';
 	}
 </script>
 
 <svelte:head>
-	<title>提示词胶囊 · Prompt Capsule</title>
+	<title>提示词卡带 · Prompt Tape</title>
 	<meta
 		name="description"
-		content="把一段长 prompt 封装成一条纯文本命令链接。人能复制，Codex / Claude 打开即读取执行。短期有效。"
+		content="把一段长 prompt 录成一张纯文本卡带链接。人一键复制，Codex / Claude 打开就能读取执行。短期有效。"
 	/>
 </svelte:head>
 
 <main class="page">
-	<section class="intro">
-		<h1>把一段长 prompt<br />封装成一条 <span class="hl">命令链接</span>。</h1>
-		<p>
-			人一键复制，把链接发给 AI，它打开就能读取里面的内容并执行。纯文本、短期有效、拿到就是一颗你自己的胶囊。
-		</p>
-		<p class="vendors">任何能读链接的 AI 都行：Codex · Claude · 豆包 · Kimi · DeepSeek · 通义…</p>
-	</section>
+	<!-- HERO -->
+	<section class="hero">
+		<div class="hero-left">
+			<h1 class="wordmark">
+				<span class="l1">提示词卡带 <span class="sl">/</span></span>
+				<span class="l2 px">PROMPT TAPE</span>
+			</h1>
+			<p class="tagline">{t('tagline_a')}<span class="hl">{t('tagline_hl')}</span>{t('tagline_b')}</p>
 
-	<div class="bay">
-		<!-- LEFT — command input -->
-		<section class="panel input-panel">
-			<div class="panel-head">
-				<span class="ph-title pc-mono">&gt;_ COMMAND INPUT</span>
-				<span class="ph-mode pc-mono">TXT MODE <b>■</b></span>
-			</div>
-			<div class="panel-body">
-				<label class="field">
-					<span class="flabel pc-mono">标题 · TITLE <i>optional</i></span>
+			<div class="input-card">
+				<div class="ic-head">
+					<span class="t px">{t('input_head')}</span>
+					<span class="m px">{t('input_mode')}</span>
+				</div>
+				<div class="ic-body">
 					<input
+						class="title-in"
 						bind:value={title}
-						placeholder="例如：AI 编程代理、周报生成器…"
+						placeholder={t('title_ph')}
 						maxlength="200"
 						disabled={busy}
 					/>
-				</label>
-				<label class="field grow">
-					<span class="flabel pc-mono">提示词内容 · PROMPT</span>
 					<textarea
+						class="body-in"
 						bind:value={content}
-						rows="12"
-						placeholder="粘贴你的长提示词 / AI 指令…"
+						placeholder={t('body_ph')}
 						disabled={busy}
 					></textarea>
-				</label>
-			</div>
-			<div class="panel-foot">
-				<div class="foot-left">
-					<div class="bytes pc-mono" class:over={bytes > MAX_BYTES}>
-						<b>{bytes.toLocaleString()}</b> / {MAX_BYTES.toLocaleString()} bytes
-					</div>
-					<div class="ttl">
-						<span class="ttl-lab">有效期</span>
-						<div class="seg">
-							<button class:on={ttl === 3600} onclick={() => (ttl = 3600)} disabled={busy}>1 小时</button>
-							<button class:on={ttl === 86400} onclick={() => (ttl = 86400)} disabled={busy}>1 天</button>
-							<button class:on={ttl === 604800} onclick={() => (ttl = 604800)} disabled={busy}>7 天</button>
-						</div>
+					<div class="bytes px" class:over={overLimit}>
+						<b>{chars.toLocaleString()}</b> / {MAX_CHARS.toLocaleString()} {t('unit_char')}
 					</div>
 				</div>
-				<button
-					class="seal-btn"
-					onclick={seal}
-					disabled={busy || content.trim() === '' || bytes > MAX_BYTES}
-				>
-					{busy ? '封装中…' : '封装胶囊'}
-					<span class="chev">»</span>
-				</button>
+				<div class="ic-foot">
+					<div class="seg" role="group" aria-label="TTL">
+						<button class:on={ttl === 3600} onclick={() => (ttl = 3600)} disabled={busy}>{t('seg_1h')}</button>
+						<button class:on={ttl === 86400} onclick={() => (ttl = 86400)} disabled={busy}>{t('seg_1d')}</button>
+						<button class:on={ttl === 604800} onclick={() => (ttl = 604800)} disabled={busy}>{t('seg_7d')}</button>
+					</div>
+					<button
+						class="seal"
+						onclick={record}
+						disabled={busy || content.trim() === '' || overLimit}
+					>
+						<span class="o"></span>{busy ? t('recording') : t('record')}
+					</button>
+				</div>
+				<div class="chips">
+					<span class="chip2">TEXT/PLAIN</span>
+					<span class="chip2"><span class="dot"></span>AGENT READY</span>
+					<span class="chip2">{t('chip_expires')} {ttlChip}</span>
+				</div>
 			</div>
-			{#if errorMsg}<p class="error pc-mono">! {errorMsg}</p>{/if}
-			<p class="expiry-hint"><b>{ttlText}后自动删除</b>：到期链接立即失效、内容清除，不可恢复。</p>
-			<p class="privacy">
-				内容存储在服务端。知道链接的人都能打开，别放密码、密钥或私密信息。
-			</p>
-		</section>
+			<p class="privacy">{t('privacy_a')}{ttlLabel}{t('privacy_valid')}{t('privacy_b')}</p>
+		</div>
 
-		<!-- RIGHT — result / specimen -->
-		<section class="panel out-panel">
-			<div class="panel-head dark">
-				<span class="ph-title pc-mono">
-					■ {result && !deleted ? '胶囊已生成' : sealing ? '封装中' : deleted ? '已删除' : '样品 · SPECIMEN'}
-				</span>
-				<span class="ph-mode pc-mono">{result && !deleted ? 'OBTAINED ✦' : '//////'}</span>
-			</div>
-			<div class="panel-body out-body">
-				{#if sealing}
-					<div class="sealing">
-						<div class="comp-num pc-mono">{compBytes.toLocaleString()}</div>
-						<div class="comp-unit pc-mono">bytes → {SLUG_LEN} chars</div>
-						<div class="comp-label pc-mono">COMPRESSING · 封装中</div>
-						<div class="comp-bar"><i></i></div>
-					</div>
-				{:else if deleted}
-					<div class="dead-state">
-						<p class="ok pc-mono">✔ 已删除。链接与内容都已失效。</p>
-						<button class="ghost-btn" onclick={reset}>再做一颗 →</button>
-					</div>
-				{:else if result}
-					<CapsuleCard
-						urlText={displayUrl}
-						slug={result.slug}
-						{ttlLabel}
-						{expiresText}
-						title={title.trim() || null}
-						seal={sealAnim}
-					/>
+		<img class="hero-img" src="/sprites/n78/hero.png" alt="提示词卡带世界：一盘卡带、URL、分享、AI Agent" />
+	</section>
 
-					<div class="out-actions">
-						<button class="act primary" onclick={() => copy(result!.agent_text, 'agent')}>
-							<span class="ai">›_</span>
-							{copied === 'agent' ? '✔ 已复制，粘给 AI 就行' : '复制给 AI 用'}
-						</button>
-						<button class="act" onclick={() => copy(result!.view_url, 'link')}>
-							{copied === 'link' ? '✔ 分享链接已复制' : '复制分享链接（发给别人）'}
-						</button>
-					</div>
+	<!-- 3 STEPS -->
+	<section class="band-row">
+		<div class="step">
+			<span class="n px">1</span>
+			<img class="sicn" src="/sprites/n78/ic-content.png" alt="" />
+			<div><h3>{t('step1_h')}</h3><p>{t('step1_p')}</p></div>
+		</div>
+		<div class="step">
+			<span class="n px">2</span>
+			<img class="sicn" src="/sprites/n78/url-tag.png" alt="" />
+			<div><h3>{t('step2_h')}</h3><p>{t('step2_p')}</p></div>
+		</div>
+		<div class="step">
+			<span class="n px">3</span>
+			<img class="sicn" src="/sprites/n78/ic-agent.png" alt="" />
+			<div><h3>{t('step3_h')}</h3><p>{t('step3_p')}</p></div>
+		</div>
+	</section>
 
-					<div class="out-meta">
-						<span><b>有效期至</b> {expiresText}</span>
-						<a href={result.view_url}>打开查看页 →</a>
-					</div>
-
-					<details class="tokbox">
-						<summary>删除口令（想删掉这颗胶囊时用）</summary>
-						<p class="tokhint">存好它，只有你能用它删掉这颗胶囊：</p>
-						<code class="token pc-mono">{result.delete_token}</code>
-					</details>
-
-					<div class="out-foot">
-						<button class="ghost-btn" onclick={reset}>再做一颗 →</button>
-						{#if confirmingDelete}
-							<span class="danger pc-mono">
-								确定删除？不可恢复。
-								<button class="del" onclick={doDelete} disabled={deleting}>
-									{deleting ? '删除中…' : '确认删除'}
-								</button>
-								<button class="linky" onclick={() => (confirmingDelete = false)}>取消</button>
-							</span>
-						{:else}
-							<button class="del-trigger" onclick={() => (confirmingDelete = true)}>删除这颗胶囊</button>
-						{/if}
-					</div>
-					{#if deleteErr}<p class="error pc-mono">! {deleteErr}</p>{/if}
-				{:else}
-					<div class="specimen">
-						<CapsuleCard
-							urlText="n78.xyz/c/a8K2mQp9"
-							slug="a8K2mQp9"
-							ttlLabel="7D"
-						/>
-						<p class="specimen-note pc-mono">
-							<span class="tag">SPECIMEN</span>
-							写完左边点「封装胶囊」，右边这颗会换成<b>你自己的</b>。
-						</p>
-					</div>
-				{/if}
-			</div>
-		</section>
-	</div>
+	<!-- 4 FEATURES -->
+	<section class="features">
+		<div class="feat">
+			<img class="icn" src="/sprites/n78/ic-privacy.png" alt="" />
+			<div><h3>{t('feat1_h')}</h3><p>{t('feat1_p')}</p></div>
+		</div>
+		<div class="feat">
+			<img class="icn" src="/sprites/n78/ic-secure.png" alt="" />
+			<div><h3>{t('feat2_h')}</h3><p>{t('feat2_p')}</p></div>
+		</div>
+		<div class="feat">
+			<img class="icn" src="/sprites/n78/ic-expire.png" alt="" />
+			<div><h3>{t('feat3_h')}</h3><p>{t('feat3_p')}</p></div>
+		</div>
+		<div class="feat">
+			<img class="icn" src="/sprites/n78/robot-idle.png" alt="" />
+			<div><h3>{t('feat4_h')}</h3><p>{t('feat4_p')}</p></div>
+		</div>
+	</section>
 </main>
 
-<Confetti key={confettiKey} />
+<!-- MODAL: record → recording → sealed -->
+{#if modalOpen}
+	<div class="modal" role="dialog" aria-modal="true" aria-label={headerText}>
+		<div class="backdrop"></div>
+		<div class="sheet">
+			<div class="sheet-head">
+				<span class="t">{headerText}</span>
+				<button class="x" onclick={reset} aria-label="关闭 / Close">✕</button>
+			</div>
+
+			{#if deleted}
+				<div class="m-deleted">
+					<span class="del-done px">DELETED ✔</span>
+					<p>{t('m_deleted_line')}</p>
+					<button class="ghost" onclick={reset}>{t('m_again')}</button>
+				</div>
+			{:else if errorMsg}
+				<div class="m-error">
+					<p class="m-err-line">{errorMsg}</p>
+					<button class="ghost" onclick={retry}>{t('m_err_retry')}</button>
+				</div>
+			{:else}
+				<div class="m-tape-wrap">
+					<img
+						class="m-cassette"
+						src={busy ? '/sprites/tape-spin.png' : '/sprites/tape-still.png'}
+						alt="你的卡带"
+					/>
+					<span class="m-url px" class:rec={busy}>{busy ? t('m_url_rec') : display}</span>
+				</div>
+				<div class="m-play px">
+					{#if busy}<span class="rec-dot"></span>{/if}{busy ? t('m_play_rec') : t('m_play_done')}
+				</div>
+
+				{#if !busy && result}
+					<div class="acts">
+						<button class="teal" onclick={() => copy(result!.agent_text, 'agent')}>
+							{copied === 'agent' ? t('m_copy_agent_done') : t('m_copy_agent')}
+						</button>
+						<button class="yellow" onclick={() => copy(result!.view_url, 'link')}>
+							{copied === 'link' ? t('m_copy_link_done') : t('m_copy_link')}
+						</button>
+					</div>
+
+					<div class="m-meta">
+						<span><b>{t('m_meta_expires')}</b> {expiresText}</span>
+						<a href={result.view_url}>{t('m_meta_open')}</a>
+					</div>
+
+					<div class="m-tok">
+						{t('m_tok_label')}
+						<code data-clarity-mask="true">{result.delete_token}</code>
+					</div>
+
+					<div class="m-foot">
+						<button class="ghost" onclick={reset}>{t('m_again')}</button>
+						{#if confirmingDelete}
+							<span class="danger px">
+								{t('m_del_q')}
+								<button class="mini-del" onclick={doDelete} disabled={deleting}>
+									{deleting ? t('m_del_yes_busy') : t('m_del_yes')}
+								</button>
+								<button class="linky" onclick={() => (confirmingDelete = false)}>{t('m_del_cancel')}</button>
+							</span>
+						{:else}
+							<button class="del" onclick={() => (confirmingDelete = true)}>{t('m_delete')}</button>
+						{/if}
+					</div>
+					{#if deleteErr}<p class="err px m-err">! {deleteErr}</p>{/if}
+				{/if}
+			{/if}
+		</div>
+	</div>
+{/if}
 
 <style>
 	.page {
-		width: min(1120px, 100%);
+		width: min(1200px, 100%);
 		margin: 0 auto;
-		padding: clamp(1.4rem, 4vw, 2.6rem) clamp(1rem, 4vw, 2.2rem) 3rem;
+		padding: clamp(1.2rem, 3.5vw, 2.2rem) clamp(1rem, 4vw, 2.4rem) 2.4rem;
+		display: flex;
+		flex-direction: column;
+		gap: clamp(1.1rem, 2.6vw, 1.6rem);
 	}
 
-	.intro {
-		margin-bottom: 1.6rem;
+	/* ---- hero ---- */
+	.hero {
+		display: grid;
+		grid-template-columns: 0.94fr 1.06fr;
+		gap: clamp(1.2rem, 3vw, 2.4rem);
+		align-items: center;
+		padding: 0.2rem 0;
 	}
-	.intro h1 {
-		margin: 0 0 0.6rem;
-		font-size: clamp(1.8rem, 5.4vw, 3rem);
-		line-height: 1.06;
+	.wordmark {
+		margin: 0 0 0.4rem;
+		line-height: 0.98;
+	}
+	.wordmark .l1 {
+		display: block;
+		font-size: clamp(2rem, 4.6vw, 3.3rem);
 		font-weight: 800;
 		letter-spacing: -0.01em;
 	}
-	.intro .hl {
-		color: var(--red);
-		position: relative;
-		white-space: nowrap;
-	}
-	.intro .hl::after {
-		content: '';
-		position: absolute;
-		left: -2px;
-		right: -2px;
-		bottom: 0.02em;
-		height: 0.34em;
-		background: rgba(207, 32, 41, 0.16);
-		z-index: -1;
-	}
-	.intro p {
-		margin: 0;
-		max-width: 44ch;
-		color: var(--ink-soft);
-		font-size: clamp(0.95rem, 2.4vw, 1.05rem);
-	}
-	.intro .vendors {
-		margin-top: 0.55rem;
-		max-width: none;
-		font-size: 0.78rem;
-		color: var(--muted);
-		letter-spacing: 0.01em;
-	}
-
-	.bay {
-		display: grid;
-		grid-template-columns: 1.02fr 0.98fr;
-		gap: clamp(1rem, 2.5vw, 1.6rem);
-		align-items: start;
-	}
-
-	.panel {
-		border: 2px solid var(--ink);
-		background: var(--paper);
-		box-shadow: var(--shadow);
-		display: flex;
-		flex-direction: column;
-	}
-
-	.panel-head {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		gap: 0.75rem;
-		padding: 0.6rem 0.9rem;
-		border-bottom: 2px solid var(--ink);
-		background: var(--paper-2);
-	}
-	.panel-head.dark {
-		background: var(--ink);
-		color: var(--code-ink);
-	}
-	.ph-title {
-		font-size: 0.78rem;
-		font-weight: 800;
-		letter-spacing: 0.08em;
-	}
-	.ph-mode {
-		font-size: 0.68rem;
-		letter-spacing: 0.12em;
-		color: var(--muted);
-	}
-	.panel-head.dark .ph-mode {
-		color: var(--cyan);
-	}
-	.ph-mode b {
-		color: var(--red);
-	}
-
-	.panel-body {
-		padding: 1rem;
-		display: flex;
-		flex-direction: column;
-		gap: 0.85rem;
-		flex: 1;
-	}
-
-	.field {
-		display: flex;
-		flex-direction: column;
-		gap: 0.35rem;
-	}
-	.field.grow {
-		flex: 1;
-	}
-	.flabel {
-		font-size: 0.7rem;
-		font-weight: 700;
-		letter-spacing: 0.06em;
-		color: var(--ink-soft);
-	}
-	.flabel i {
-		font-style: normal;
+	.wordmark .l1 .sl {
 		color: var(--muted);
 		font-weight: 400;
 	}
-	input,
-	textarea {
-		width: 100%;
-		border: 2px solid var(--ink);
-		border-radius: var(--radius);
-		background: var(--paper-2);
-		padding: 0.6rem 0.7rem;
-		font-size: 0.95rem;
-		font-family: inherit;
-		color: var(--ink);
+	.wordmark .l2 {
+		display: block;
+		font-family: var(--fp);
+		color: var(--red);
+		font-size: clamp(1.9rem, 4.5vw, 3.4rem);
+		line-height: 1;
+		margin-top: 0.1rem;
+		white-space: nowrap;
 	}
-	textarea {
-		font-family: var(--mono);
-		font-size: 0.86rem;
-		line-height: 1.55;
-		resize: vertical;
-		min-height: 220px;
+	.tagline {
+		margin: 0.35rem 0 1rem;
+		font-size: clamp(1.02rem, 2.6vw, 1.35rem);
+		font-weight: 700;
+		color: var(--ink-2);
 	}
-	input:focus,
-	textarea:focus {
-		outline: none;
-		box-shadow: var(--shadow-sm);
-		border-color: var(--ink);
-	}
-	input:disabled,
-	textarea:disabled {
-		opacity: 0.6;
+	.tagline .hl {
+		color: #fff;
+		background: var(--red);
+		border: 2.5px solid var(--red-deep);
+		border-radius: 7px;
+		padding: 0 0.3rem;
+		display: inline-block;
+		transform: rotate(-1deg);
 	}
 
-	.panel-foot {
-		display: flex;
-		align-items: flex-end;
-		justify-content: space-between;
-		gap: 1rem;
-		flex-wrap: wrap;
-		padding: 0.85rem 1rem;
-		border-top: 2px solid var(--ink);
-		background: var(--paper-2);
+	.input-card {
+		border: 2.5px solid var(--ink);
+		border-radius: 11px;
+		background: var(--cream-lit);
+		box-shadow: 0 4px 0 rgba(28, 26, 23, 0.14);
+		overflow: hidden;
 	}
-	.foot-left {
+	.ic-head {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		padding: 0.45rem 0.7rem;
+		border-bottom: 2.5px solid var(--ink);
+		background: var(--paper);
+	}
+	.ic-head .t {
+		font-size: 0.78rem;
+	}
+	.ic-head .m {
+		font-size: 0.62rem;
+		color: var(--muted);
+	}
+	.ic-body {
+		padding: 0.6rem 0.7rem 0.4rem;
 		display: flex;
 		flex-direction: column;
 		gap: 0.5rem;
 	}
+	.title-in {
+		width: 100%;
+		border: 2px solid var(--ink);
+		border-radius: 6px;
+		background: var(--paper);
+		padding: 0.42rem 0.6rem;
+		font-family: var(--fs);
+		font-size: 0.82rem;
+		color: var(--ink);
+	}
+	.title-in::placeholder {
+		color: var(--muted);
+	}
+	.title-in:focus,
+	.body-in:focus {
+		outline: 3px solid var(--teal);
+		outline-offset: 1px;
+	}
+	.body-in {
+		width: 100%;
+		height: 132px;
+		resize: vertical;
+		min-height: 96px;
+		overflow: auto;
+		border: 2.5px solid var(--ink);
+		border-radius: 7px;
+		background: var(--paper);
+		box-shadow: inset 0 0 0 3px var(--paper), inset 0 0 0 4px #d8ccb8;
+		padding: 0.55rem 0.7rem;
+		font-family: var(--fm);
+		font-size: 0.86rem;
+		line-height: 1.55;
+		color: var(--ink);
+	}
 	.bytes {
-		font-size: 0.75rem;
+		align-self: flex-end;
+		font-size: 0.66rem;
 		color: var(--muted);
 	}
 	.bytes b {
-		color: var(--ink);
+		color: var(--ink-2);
 	}
-	.bytes.over b,
-	.bytes.over {
+	.bytes.over,
+	.bytes.over b {
 		color: var(--red);
 	}
-	.ttl {
+	.ic-foot {
 		display: flex;
 		align-items: center;
-		gap: 0.5rem;
-	}
-	.ttl-lab {
-		font-size: 0.72rem;
-		font-weight: 700;
-		color: var(--ink-soft);
+		justify-content: space-between;
+		gap: 0.7rem;
+		flex-wrap: wrap;
+		padding: 0.55rem 0.7rem;
+		border-top: 2.5px solid var(--ink);
+		background: var(--paper);
 	}
 	.seg {
 		display: inline-flex;
-		border: 2px solid var(--ink);
-		border-radius: var(--radius);
-		overflow: hidden;
+		gap: 5px;
 	}
 	.seg button {
-		border: none;
-		background: var(--paper);
-		padding: 0.35rem 0.7rem;
-		font-family: var(--sans);
-		font-size: 0.78rem;
+		padding: 0.3rem 0.62rem;
+		font-family: var(--fs);
+		font-size: 0.72rem;
 		font-weight: 700;
+		color: var(--ink-2);
+		border: 2.5px solid var(--ink);
+		border-radius: 6px;
+		background: #fff;
+		box-shadow: 0 2px 0 rgba(28, 26, 23, 0.22);
 		cursor: pointer;
-		color: var(--ink-soft);
-		border-right: 2px solid var(--ink);
-	}
-	.seg button:last-child {
-		border-right: none;
 	}
 	.seg button.on {
 		background: var(--red);
+		border-color: var(--red-deep);
 		color: #fff;
+		box-shadow: 0 2px 0 var(--red-deep);
 	}
-
-	.seal-btn {
+	.seg button:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
+	}
+	.seal {
 		display: inline-flex;
 		align-items: center;
-		gap: 0.5rem;
-		border: 2px solid var(--red-deep);
+		gap: 0.45rem;
+		border: 2.5px solid var(--red-deep);
 		background: var(--red);
 		color: #fff;
-		font-size: 1rem;
+		font-family: var(--fs);
 		font-weight: 800;
-		letter-spacing: 0.02em;
-		padding: 0.7rem 1.3rem;
-		border-radius: var(--radius);
+		font-size: 0.95rem;
+		padding: 0.48rem 1.05rem;
+		border-radius: 9px;
+		box-shadow: 0 4px 0 var(--red-deep);
 		cursor: pointer;
-		box-shadow: var(--shadow-sm);
-		transition: transform 0.06s ease, box-shadow 0.06s ease;
 	}
-	.seal-btn .chev {
-		font-family: var(--mono);
+	.seal:hover:not(:disabled) {
+		filter: brightness(1.04);
 	}
-	.seal-btn:hover:not(:disabled) {
-		transform: translate(-1px, -1px);
-		box-shadow: 4px 4px 0 var(--ink);
+	.seal:active:not(:disabled) {
+		transform: translateY(3px);
+		box-shadow: 0 1px 0 var(--red-deep);
 	}
-	.seal-btn:active:not(:disabled) {
-		transform: translate(2px, 2px);
-		box-shadow: 1px 1px 0 var(--ink);
-	}
-	.seal-btn:disabled {
-		opacity: 0.42;
+	.seal:disabled {
+		opacity: 0.5;
 		cursor: not-allowed;
-		box-shadow: none;
 	}
-
-	.error {
-		margin: 0.6rem 1rem 0;
-		color: var(--red-deep);
-		font-size: 0.82rem;
-		font-weight: 700;
+	.seal .o {
+		width: 10px;
+		height: 10px;
+		border-radius: 50%;
+		background: #fff;
+		box-shadow: inset 0 0 0 2px var(--red);
 	}
-	.expiry-hint {
-		margin: 0.75rem 1rem 0;
-		font-size: 0.76rem;
-		color: var(--ink-soft);
-		line-height: 1.5;
+	.chips {
+		display: flex;
+		gap: 0.4rem;
+		flex-wrap: wrap;
+		padding: 0.55rem 0.7rem;
+		border-top: 1.5px dashed var(--line);
 	}
-	.expiry-hint b {
-		color: var(--red-deep);
-		font-weight: 800;
+	.chip2 {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.35rem;
+		border: 2px solid var(--ink);
+		border-radius: 5px;
+		background: var(--cream-lit);
+		padding: 0.22rem 0.5rem;
+		font-family: var(--fp);
+		font-size: 0.66rem;
+	}
+	.chip2 .dot {
+		width: 7px;
+		height: 7px;
+		background: var(--teal);
+		border: 1.5px solid var(--teal-deep);
 	}
 	.privacy {
-		margin: 0.35rem 1rem 1rem;
+		margin: 0.6rem 0 0;
 		font-size: 0.72rem;
 		color: var(--muted);
-		line-height: 1.5;
 	}
 
-	/* ---- output body ---- */
-	.out-body {
-		gap: 0.9rem;
+	.hero-img {
+		width: 100%;
+		height: auto;
+		max-height: 460px;
+		object-fit: contain;
+		display: block;
 	}
 
-	.specimen {
+	/* ---- 3 steps ---- */
+	.band-row {
+		display: grid;
+		grid-template-columns: repeat(3, 1fr);
+		gap: 1rem;
+	}
+	.step {
 		position: relative;
+		border: 2.5px solid var(--ink);
+		border-radius: 12px;
+		background: var(--cream-lit);
+		box-shadow: 0 4px 0 rgba(28, 26, 23, 0.14);
+		padding: 1.1rem 1.1rem 1.1rem 1.2rem;
+		display: flex;
+		gap: 0.9rem;
+		align-items: center;
+		min-height: 96px;
 	}
-	.specimen :global(.cc) {
-		opacity: 0.86;
+	.step .sicn {
+		width: 56px;
+		height: 56px;
+		flex: none;
+		object-fit: contain;
 	}
-	.specimen-note {
-		margin: 0.9rem 0 0;
-		font-size: 0.78rem;
-		color: var(--ink-soft);
+	.step .n {
+		position: absolute;
+		top: -11px;
+		left: -9px;
+		width: 28px;
+		height: 28px;
+		display: grid;
+		place-items: center;
+		border: 2.5px solid var(--ink);
+		border-radius: 7px;
+		background: #1c1a17;
+		color: #fff;
+		font-size: 0.95rem;
+		box-shadow: 0 3px 0 rgba(28, 26, 23, 0.3);
+	}
+	.step:nth-child(1) .n {
+		background: var(--yellow);
+		color: #3a2c05;
+	}
+	.step:nth-child(2) .n {
+		background: var(--teal);
+		color: #f2fffb;
+	}
+	.step:nth-child(3) .n {
+		background: var(--red);
+		color: #fff;
+	}
+	.step h3 {
+		margin: 0 0 0.1rem;
+		font-size: 0.9rem;
+	}
+	.step p {
+		margin: 0;
+		font-size: 0.76rem;
+		color: var(--ink-2);
+		line-height: 1.4;
+	}
+
+	/* ---- 4 features ---- */
+	.features {
+		display: grid;
+		grid-template-columns: repeat(4, 1fr);
+		gap: 1rem;
+	}
+	.feat {
+		border: 2.5px solid var(--ink);
+		border-radius: 12px;
+		background: var(--cream-lit);
+		box-shadow: 0 4px 0 rgba(28, 26, 23, 0.14);
+		padding: 1rem;
+		display: flex;
+		gap: 0.75rem;
+		align-items: center;
+		min-height: 92px;
+	}
+	.feat .icn {
+		width: 50px;
+		height: 50px;
+		flex: none;
+		object-fit: contain;
+	}
+	.feat h3 {
+		margin: 0 0 0.18rem;
+		font-size: 0.95rem;
+	}
+	.feat p {
+		margin: 0;
+		font-size: 0.76rem;
+		color: var(--ink-2);
+		line-height: 1.45;
+	}
+
+	/* ---- modal ---- */
+	.modal {
+		position: fixed;
+		inset: 0;
+		z-index: 60;
+	}
+	.backdrop {
+		position: absolute;
+		inset: 0;
+		background: rgba(28, 26, 23, 0.55);
+	}
+	.sheet {
+		position: absolute;
+		left: 50%;
+		top: 50%;
+		transform: translate(-50%, -50%);
+		width: min(440px, 92vw);
+		max-height: 92vh;
+		overflow: auto;
+		border: 3px solid var(--ink);
+		border-radius: 14px;
+		background: var(--cream-lit);
+		box-shadow: 0 10px 0 rgba(28, 26, 23, 0.3);
+		padding: 1rem 1.1rem 1.1rem;
+		animation: sheet-pop 0.16s ease-out;
+	}
+	@keyframes sheet-pop {
+		from {
+			transform: translate(-50%, -50%) scale(0.9);
+		}
+	}
+	.sheet-head {
 		display: flex;
 		align-items: center;
-		gap: 0.5rem;
-		flex-wrap: wrap;
-		line-height: 1.5;
+		justify-content: space-between;
+		margin-bottom: 0.7rem;
 	}
-	.specimen-note .tag {
-		background: var(--ink);
-		color: var(--code-ink);
-		padding: 0.15rem 0.45rem;
-		font-size: 0.62rem;
-		letter-spacing: 0.14em;
+	.sheet-head .t {
+		font-weight: 800;
+		font-size: 1.05rem;
 	}
-	.specimen-note b {
-		color: var(--red);
+	.sheet-head .x {
+		border: 2px solid var(--ink);
+		background: var(--cream);
+		border-radius: 6px;
+		width: 28px;
+		height: 28px;
+		cursor: pointer;
+		font-weight: 800;
+		box-shadow: 0 2px 0 var(--ink);
 	}
-
-	/* sealing / compression */
-	.sealing {
+	.sheet-head .x:active {
+		transform: translateY(2px);
+		box-shadow: none;
+	}
+	.m-tape-wrap {
+		position: relative;
+		width: 86%;
+		margin: 0.2rem auto 0.5rem;
+	}
+	.m-cassette {
+		display: block;
+		width: 100%;
+		height: auto;
+	}
+	.m-url {
+		position: absolute;
+		top: 18%;
+		left: 50%;
+		transform: translate(-50%, -50%);
+		font-weight: 700;
+		font-size: clamp(0.82rem, 3.2vw, 1.12rem);
+		color: var(--ink);
+		white-space: nowrap;
+		letter-spacing: 0.01em;
+	}
+	.m-url.rec {
+		color: var(--muted);
+	}
+	.m-play {
 		display: flex;
-		flex-direction: column;
 		align-items: center;
 		justify-content: center;
 		gap: 0.4rem;
-		min-height: 260px;
-		text-align: center;
+		color: var(--ink-2);
+		font-size: 0.72rem;
+		letter-spacing: 0.14em;
+		margin-bottom: 0.8rem;
 	}
-	.comp-num {
-		font-size: clamp(2.4rem, 9vw, 3.6rem);
-		font-weight: 900;
-		color: var(--ink);
-		font-variant-numeric: tabular-nums;
-		line-height: 1;
-		animation: comp-pulse 0.78s ease;
+	.rec-dot {
+		width: 9px;
+		height: 9px;
+		border-radius: 50%;
+		background: var(--red);
+		animation: rec-pulse 1s infinite;
 	}
-	@keyframes comp-pulse {
+	@keyframes rec-pulse {
 		0% {
-			transform: scale(1.15);
-			color: var(--red);
+			box-shadow: 0 0 0 0 rgba(229, 53, 43, 0.5);
+		}
+		70% {
+			box-shadow: 0 0 0 6px rgba(229, 53, 43, 0);
 		}
 		100% {
-			transform: scale(1);
-			color: var(--ink);
+			box-shadow: 0 0 0 0 rgba(229, 53, 43, 0);
 		}
 	}
-	.comp-unit {
-		font-size: 0.82rem;
-		color: var(--cyan-ink);
-		letter-spacing: 0.06em;
-	}
-	.comp-label {
-		margin-top: 0.6rem;
-		font-size: 0.72rem;
-		letter-spacing: 0.24em;
-		color: var(--muted);
-	}
-	.comp-bar {
-		margin-top: 0.5rem;
-		width: 180px;
-		max-width: 70%;
-		height: 6px;
-		border: 1.5px solid var(--ink);
-		background: var(--paper-2);
-		overflow: hidden;
-	}
-	.comp-bar i {
-		display: block;
-		height: 100%;
-		background: var(--red);
-		animation: comp-fill 0.9s ease forwards;
-	}
-	@keyframes comp-fill {
-		from {
-			width: 8%;
-		}
-		to {
-			width: 100%;
-		}
-	}
-
-	/* actions */
-	.out-actions {
-		display: flex;
-		flex-direction: column;
+	.acts {
+		display: grid;
+		grid-template-columns: 1.2fr 1fr;
 		gap: 0.5rem;
 	}
-	.act {
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
-		gap: 0.45rem;
-		border: 2px solid var(--ink);
-		background: var(--paper-2);
-		border-radius: var(--radius);
-		padding: 0.6rem 0.8rem;
-		font-size: 0.85rem;
-		font-weight: 700;
+	.acts button {
+		border: 2.5px solid var(--ink);
+		border-radius: 8px;
+		font-family: var(--fs);
+		font-weight: 800;
+		font-size: 0.84rem;
+		padding: 0.5rem;
 		cursor: pointer;
-		color: var(--ink);
+		box-shadow: 0 3px 0 var(--ink);
 	}
-	.act:hover {
-		background: var(--paper);
-		box-shadow: var(--shadow-sm);
+	.acts button:active {
+		transform: translateY(3px);
+		box-shadow: none;
 	}
-	.act.primary {
-		background: var(--ink);
-		color: var(--code-ink);
+	.acts .teal {
+		background: var(--teal);
+		border-color: var(--teal-deep);
+		color: #f2fffb;
+		box-shadow: 0 3px 0 var(--teal-deep);
 	}
-	.act.primary:hover {
-		background: #000;
+	.acts .yellow {
+		background: var(--yellow);
+		border-color: var(--yellow-deep);
+		color: #3a2c05;
+		box-shadow: 0 3px 0 var(--yellow-deep);
 	}
-	.act .ai {
-		font-family: var(--mono);
-		color: var(--cyan);
-	}
-
-	.out-meta {
+	.m-meta {
 		display: flex;
-		align-items: center;
 		justify-content: space-between;
-		gap: 0.75rem;
+		gap: 0.5rem;
 		flex-wrap: wrap;
 		font-size: 0.72rem;
 		color: var(--muted);
-		border-top: 1.5px dashed var(--line);
+		border-top: 2px dashed var(--line);
+		margin-top: 0.8rem;
 		padding-top: 0.6rem;
 	}
-	.out-meta b {
+	.m-meta b {
 		color: var(--red-deep);
 	}
-	.out-meta a {
+	.m-meta a {
 		color: var(--ink);
 		font-weight: 700;
 	}
-
-	.tokbox {
-		border: 1.5px dashed var(--line);
-		padding: 0.5rem 0.7rem;
-		font-size: 0.8rem;
-	}
-	.tokbox summary {
-		cursor: pointer;
-		font-size: 0.72rem;
-		font-weight: 700;
-		letter-spacing: 0.04em;
-		color: var(--ink-soft);
-	}
-	.tokhint {
-		margin: 0.5rem 0 0.3rem;
+	.m-tok {
+		border: 2px dashed var(--line);
+		border-radius: 6px;
+		padding: 0.4rem 0.6rem;
+		margin-top: 0.6rem;
 		font-size: 0.72rem;
 		color: var(--muted);
 	}
-	.token {
+	.m-tok code {
 		display: block;
-		word-break: break-all;
-		font-size: 0.76rem;
+		font-family: var(--fp);
 		color: var(--ink);
-		background: var(--paper-2);
-		border: 1px solid var(--line);
-		padding: 0.4rem 0.5rem;
+		background: var(--paper);
+		border: 1.5px solid var(--line);
+		border-radius: 4px;
+		padding: 0.35rem 0.45rem;
+		margin-top: 0.3rem;
+		word-break: break-all;
+		letter-spacing: 0.02em;
 	}
-
-	.out-foot {
+	.m-foot {
 		display: flex;
-		align-items: center;
 		justify-content: space-between;
-		gap: 0.75rem;
+		align-items: center;
+		gap: 0.5rem;
 		flex-wrap: wrap;
+		margin-top: 0.8rem;
 	}
-	.ghost-btn {
-		border: 2px solid var(--ink);
+	.m-foot .ghost,
+	.m-deleted .ghost,
+	.m-error .ghost {
+		border: 2.5px solid var(--ink);
 		background: transparent;
-		border-radius: var(--radius);
-		padding: 0.5rem 0.9rem;
+		border-radius: 7px;
+		padding: 0.42rem 0.9rem;
+		font-family: var(--fs);
 		font-weight: 700;
-		font-size: 0.85rem;
+		font-size: 0.82rem;
 		cursor: pointer;
 		color: var(--ink);
+		box-shadow: 0 3px 0 var(--ink);
 	}
-	.ghost-btn:hover {
-		background: var(--paper-2);
+	.m-foot .ghost:active,
+	.m-deleted .ghost:active,
+	.m-error .ghost:active {
+		transform: translateY(3px);
+		box-shadow: none;
 	}
-	.del-trigger {
+	.del {
 		border: none;
 		background: none;
 		color: var(--muted);
-		font-size: 0.78rem;
+		font-size: 0.76rem;
 		cursor: pointer;
-		padding: 0.5rem 0;
 	}
-	.del-trigger:hover {
+	.del:hover {
 		color: var(--red);
 		text-decoration: underline;
 	}
@@ -802,20 +868,19 @@
 		align-items: center;
 		gap: 0.5rem;
 		flex-wrap: wrap;
-		font-size: 0.78rem;
+		font-size: 0.76rem;
 		color: var(--red-deep);
 	}
-	.del {
+	.mini-del {
 		border: 2px solid var(--red-deep);
 		background: var(--red);
 		color: #fff;
-		border-radius: var(--radius);
-		padding: 0.35rem 0.7rem;
-		font-weight: 700;
+		border-radius: 6px;
+		padding: 0.28rem 0.6rem;
+		font-family: var(--fs);
+		font-weight: 800;
+		font-size: 0.76rem;
 		cursor: pointer;
-	}
-	.del:disabled {
-		opacity: 0.5;
 	}
 	.linky {
 		border: none;
@@ -823,40 +888,70 @@
 		color: var(--muted);
 		cursor: pointer;
 		text-decoration: underline;
+		font-size: 0.76rem;
 	}
-
-	.dead-state {
-		min-height: 240px;
+	.err {
+		color: var(--red-deep);
+		font-size: 0.82rem;
+		font-weight: 700;
+	}
+	.m-err {
+		margin: 0.5rem 0 0;
+	}
+	.m-deleted,
+	.m-error {
+		text-align: center;
+		padding: 1.4rem 0 0.6rem;
 		display: flex;
 		flex-direction: column;
 		align-items: center;
-		justify-content: center;
-		gap: 1rem;
+		gap: 0.8rem;
 	}
-	.dead-state .ok {
+	.del-done {
+		color: var(--teal-deep);
+		font-size: 1.2rem;
+		letter-spacing: 0.08em;
+	}
+	.m-deleted p,
+	.m-err-line {
+		margin: 0;
+		font-size: 0.9rem;
+		color: var(--ink-2);
+		max-width: 30ch;
+		line-height: 1.6;
+	}
+	.m-err-line {
+		color: var(--red-deep);
 		font-weight: 700;
-		color: var(--cyan-ink);
 	}
 
 	/* ---- responsive ---- */
-	@media (max-width: 820px) {
-		.bay {
+	@media (max-width: 900px) {
+		.hero {
 			grid-template-columns: 1fr;
 		}
-		.out-panel {
+		.hero-img {
 			order: -1;
+			max-height: 300px;
 		}
-		textarea {
-			min-height: 160px;
+		.band-row,
+		.features {
+			grid-template-columns: 1fr 1fr;
 		}
 	}
-	@media (max-width: 480px) {
-		.panel-foot {
-			flex-direction: column;
-			align-items: stretch;
+	@media (max-width: 560px) {
+		.band-row,
+		.features {
+			grid-template-columns: 1fr;
 		}
-		.seal-btn {
-			justify-content: center;
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.sheet {
+			animation: none;
+		}
+		.rec-dot {
+			animation: none;
 		}
 	}
 </style>

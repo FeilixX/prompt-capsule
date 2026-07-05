@@ -35,3 +35,7 @@ Thumbs.db
 # Vite
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+
+# Working scratch (design mocks, renders, screenshots, image-slice source)
+renders/
+/visual-system-*.html

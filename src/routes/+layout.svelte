@@ -1,9 +1,45 @@
 <script lang="ts">
 	import '../app.css';
 	import favicon from '$lib/assets/favicon.svg';
+	import TapeIcon from '$lib/components/TapeIcon.svelte';
+	import { i18n, t, setLocale, initLocale } from '$lib/i18n.svelte';
+	import { onMount } from 'svelte';
+	import { dev } from '$app/environment';
+	import { env } from '$env/dynamic/public';
 
 	let { children } = $props();
 	let showPolicy = $state(false);
+
+	// Microsoft Clarity — anonymous usage stats + heatmaps. Prompt content and the
+	// delete token are masked (inputs auto-mask; the non-input prompt/title/token
+	// carry data-clarity-mask), so nothing a user types or views is ever uploaded.
+	// Public, non-secret project id; override via PUBLIC_CLARITY_ID, empty to disable.
+	const CLARITY_ID = env.PUBLIC_CLARITY_ID ?? 'xhnibg6pub';
+
+	$effect(() => {
+		initLocale();
+	});
+
+	onMount(() => {
+		if (dev || !CLARITY_ID) return; // never send localhost sessions to the dashboard
+		type ClarityApi = { (...args: unknown[]): void; q?: unknown[] };
+		const w = window as Window & { clarity?: ClarityApi };
+		if (!w.clarity) {
+			const c: ClarityApi = (...args: unknown[]) => {
+				(c.q = c.q || []).push(args);
+			};
+			w.clarity = c;
+		}
+		const s = document.createElement('script');
+		s.async = true;
+		s.src = 'https://www.clarity.ms/tag/' + CLARITY_ID;
+		const first = document.getElementsByTagName('script')[0];
+		first?.parentNode?.insertBefore(s, first);
+	});
+
+	function toggleLang() {
+		setLocale(i18n.locale === 'zh' ? 'en' : 'zh');
+	}
 </script>
 
 <svelte:head>
@@ -13,42 +49,36 @@
 <div class="shell">
 	<header class="topbar">
 		<a class="brand" href="/">
-			<svg class="mark" viewBox="0 0 40 40" aria-hidden="true">
-				<rect x="2" y="2" width="36" height="36" rx="7" fill="#14110f" />
-				<rect x="6.5" y="17" width="27" height="13" rx="6.5" fill="#fbf6ec" />
-				<path d="M6.5 23.5h13.5v6.5A6.5 6.5 0 0 1 6.5 23.5z" fill="#cf2029" />
-				<circle cx="27" cy="10.5" r="3" fill="#cf2029" />
-			</svg>
+			<TapeIcon size={34} />
 			<span class="wordmark">
-				<strong>提示词胶囊</strong>
-				<em>Prompt&nbsp;Capsule</em>
+				<strong>提示词卡带</strong>
+				<em class="px">PROMPT&nbsp;TAPE</em>
 			</span>
 		</a>
 
 		<div class="top-right">
-			<div class="status pc-mono">
-				<span>PC-7D</span><i>·</i><span>TEXT/PLAIN</span><i>·</i><span class="ok"
-					><span class="pc-dot"></span>AGENT&nbsp;READY</span
-				>
+			<div class="status px">
+				<span>TEXT/PLAIN</span><i>·</i><span class="ok"><span class="px-dot"></span>AGENT&nbsp;READY</span>
 			</div>
+			<button class="lang-btn px" onclick={toggleLang} aria-label="切换语言 / Switch language">
+				{t('nav_lang')}
+			</button>
 			<button
 				class="notice-btn"
 				aria-expanded={showPolicy}
 				onclick={() => (showPolicy = !showPolicy)}
 			>
-				<span class="warn">!</span>内容须知
+				<span class="warn">!</span>{t('nav_rules')}
 			</button>
 		</div>
 	</header>
 
 	{#if showPolicy}
 		<button class="policy-backdrop" aria-label="关闭" onclick={() => (showPolicy = false)}></button>
-		<div class="policy-pop" role="dialog" aria-label="内容须知">
-			<strong>内容须知</strong>
-			<p>
-				请勿创建或传播违法、侵权、色情、暴力、赌博、诈骗、仇恨或危害他人安全的内容。违规胶囊一经发现即删除，情节严重的将上报相关部门。你需为自己封装与分享的内容承担全部责任。
-			</p>
-			<button class="policy-ok" onclick={() => (showPolicy = false)}>知道了</button>
+		<div class="policy-pop px-panel" role="dialog" aria-label={t('policy_title')}>
+			<strong>{t('policy_title')}</strong>
+			<p>{t('policy_body')}</p>
+			<button class="px-btn is-red policy-ok" onclick={() => (showPolicy = false)}>{t('policy_ok')}</button>
 		</div>
 	{/if}
 
@@ -57,13 +87,11 @@
 	</div>
 
 	<footer class="footbar">
-		<div class="foot-brand pc-mono">
-			<span>ALL SEALED. ALL YOURS.</span>
+		<div class="foot-brand px">
+			<span><span class="rec">●</span> RECORD IT · SHARE IT · LET IT EXPIRE</span>
 			<span class="sep">text/plain · n78.xyz</span>
 		</div>
-		<p class="disclaimer">
-			免责声明：胶囊内容由用户自行创建与分享，与本站立场无关；本服务为临时存储，可能随时失效或删除，不保证可用性。请勿存放密码、密钥、隐私或违法信息，因使用产生的风险与损失由用户自行承担。
-		</p>
+		<p class="disclaimer">{t('disclaimer')}</p>
 	</footer>
 </div>
 
@@ -83,91 +111,82 @@
 		justify-content: space-between;
 		gap: 1rem;
 		padding: 0.7rem clamp(1rem, 4vw, 2.2rem);
-		border-bottom: 2px solid var(--ink);
-		background: rgba(242, 237, 226, 0.9);
+		border-bottom: 2.5px solid var(--ink);
+		background: rgba(244, 239, 225, 0.92);
 		backdrop-filter: blur(8px);
 	}
 
 	.brand {
 		display: flex;
 		align-items: center;
-		gap: 0.6rem;
+		gap: 0.55rem;
 		text-decoration: none;
 		color: var(--ink);
 	}
-
-	.mark {
-		width: 34px;
-		height: 34px;
-		flex: none;
-		display: block;
-	}
-
 	.wordmark {
 		display: flex;
 		flex-direction: column;
-		line-height: 1.05;
+		line-height: 1.02;
 	}
-
 	.wordmark strong {
-		font-size: 1.15rem;
+		font-size: 1.16rem;
 		font-weight: 800;
-		letter-spacing: 0.01em;
+		letter-spacing: 0.02em;
 	}
-
 	.wordmark em {
-		font-family: var(--mono);
 		font-style: normal;
-		font-size: 0.66rem;
-		letter-spacing: 0.14em;
-		text-transform: uppercase;
+		font-size: 0.64rem;
+		letter-spacing: 0.16em;
 		color: var(--muted);
-	}
-
-	.status {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-		font-size: 0.72rem;
-		font-weight: 700;
-		letter-spacing: 0.03em;
-		color: var(--ink-soft);
-	}
-
-	.status i {
-		color: var(--line);
-		font-style: normal;
-	}
-
-	.status .ok {
-		display: inline-flex;
-		align-items: center;
-		gap: 0.35rem;
-		color: var(--cyan-ink);
+		margin-top: 2px;
 	}
 
 	.top-right {
 		display: flex;
 		align-items: center;
-		gap: 0.9rem;
+		gap: 0.85rem;
+	}
+	.status {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		font-size: 0.66rem;
+		letter-spacing: 0.04em;
+		color: var(--muted);
+	}
+	.status i {
+		color: var(--line);
+		font-style: normal;
+	}
+	.status .ok {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.35rem;
+		color: var(--teal-deep);
 	}
 
 	.notice-btn {
 		display: inline-flex;
 		align-items: center;
 		gap: 0.35rem;
-		border: 1.5px solid var(--ink);
-		background: var(--paper-2);
+		border: 2px solid var(--ink);
+		border-radius: var(--radius-sm);
+		background: var(--cream-lit);
 		color: var(--ink);
-		font-size: 0.72rem;
+		font-family: var(--fs);
+		font-size: 0.74rem;
 		font-weight: 700;
-		padding: 0.3rem 0.6rem;
-		border-radius: var(--radius);
+		padding: 0.32rem 0.6rem;
 		cursor: pointer;
 		white-space: nowrap;
+		box-shadow: 0 2px 0 var(--ink);
 	}
 	.notice-btn:hover {
-		box-shadow: var(--shadow-sm);
+		filter: brightness(1.03);
+	}
+	.notice-btn:active {
+		transform: translateY(2px);
+		box-shadow: none;
 	}
 	.notice-btn .warn {
 		display: inline-grid;
@@ -182,46 +201,59 @@
 		line-height: 1;
 	}
 
+	.lang-btn {
+		border: 2px solid var(--ink);
+		border-radius: var(--radius-sm);
+		background: var(--cream-lit);
+		color: var(--ink);
+		font-size: 0.74rem;
+		font-weight: 700;
+		letter-spacing: 0.04em;
+		padding: 0.3rem 0.55rem;
+		min-width: 34px;
+		cursor: pointer;
+		box-shadow: 0 2px 0 var(--ink);
+	}
+	.lang-btn:hover {
+		filter: brightness(1.03);
+	}
+	.lang-btn:active {
+		transform: translateY(2px);
+		box-shadow: none;
+	}
+
 	.policy-backdrop {
 		position: fixed;
 		inset: 0;
 		z-index: 40;
 		border: none;
-		background: rgba(20, 17, 15, 0.28);
+		background: rgba(28, 26, 23, 0.3);
 		cursor: default;
 	}
 	.policy-pop {
 		position: fixed;
-		top: 3.6rem;
+		top: 3.7rem;
 		right: clamp(1rem, 4vw, 2.2rem);
 		z-index: 41;
 		width: min(360px, calc(100vw - 2rem));
-		border: 2px solid var(--ink);
-		background: var(--paper);
-		box-shadow: var(--shadow);
+		box-shadow: 0 8px 0 rgba(28, 26, 23, 0.18);
 		padding: 1rem 1.1rem 1.1rem;
 	}
 	.policy-pop strong {
 		display: block;
-		font-size: 0.95rem;
+		font-size: 0.98rem;
 		font-weight: 800;
 		margin-bottom: 0.5rem;
 	}
 	.policy-pop p {
 		margin: 0 0 0.9rem;
-		font-size: 0.8rem;
-		line-height: 1.65;
-		color: var(--ink-soft);
+		font-size: 0.82rem;
+		line-height: 1.7;
+		color: var(--ink-2);
 	}
 	.policy-ok {
-		border: 2px solid var(--ink);
-		background: var(--ink);
-		color: var(--code-ink);
-		font-weight: 700;
-		font-size: 0.82rem;
-		padding: 0.45rem 1rem;
-		border-radius: var(--radius);
-		cursor: pointer;
+		font-size: 0.85rem;
+		padding: 0.5rem 1.1rem;
 	}
 
 	.content {
@@ -229,42 +261,36 @@
 	}
 
 	.footbar {
-		padding: 0.75rem clamp(1rem, 4vw, 2.2rem) 0.9rem;
-		border-top: 2px solid var(--ink);
+		padding: 0.8rem clamp(1rem, 4vw, 2.2rem) 1rem;
+		border-top: 2.5px solid var(--ink);
 		background: var(--ink);
-		color: var(--code-ink);
+		color: var(--cream);
 	}
-
 	.foot-brand {
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
 		gap: 1rem;
-		font-size: 0.66rem;
-		letter-spacing: 0.14em;
-		text-transform: uppercase;
+		font-size: 0.64rem;
+		letter-spacing: 0.1em;
 	}
-
+	.foot-brand .rec {
+		color: var(--red);
+	}
 	.foot-brand .sep {
-		color: var(--cyan);
-		text-transform: none;
+		color: var(--teal);
 		letter-spacing: 0.06em;
 	}
-
 	.disclaimer {
 		margin: 0.55rem 0 0;
 		max-width: 82ch;
 		font-size: 0.64rem;
-		line-height: 1.55;
-		letter-spacing: 0.01em;
-		color: rgba(242, 232, 214, 0.5);
+		line-height: 1.6;
+		color: rgba(244, 239, 225, 0.5);
 	}
 
 	@media (max-width: 560px) {
 		.status {
-			display: none;
-		}
-		.wordmark em {
 			display: none;
 		}
 	}

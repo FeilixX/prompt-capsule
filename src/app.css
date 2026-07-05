@@ -1,33 +1,53 @@
-/* Prompt Capsule — design system
-   Warm-paper neo-brutalist "collectible command label" (Gate 2).
-   Palette + primitives derived from hero-object research (H4). */
+/* 提示词卡带 · PROMPT TAPE — clean 8bit world design system.
+   Crisp pixels, not distressed. Big type, generous whitespace, limited warm
+   palette. Latin + objects are pixel; Chinese stays vector (never pixelated).
+   Boldness spent on ONE signature: the cassette. Everything else stays quiet. */
+
+@font-face {
+	font-family: 'Pixelify Sans';
+	font-style: normal;
+	font-weight: 400 700;
+	font-display: swap;
+	src: url('/fonts/pixelify-sans-latin.woff2') format('woff2');
+	unicode-range: U+0000-00FF, U+0131, U+2000-206F, U+20AC, U+2122, U+2191,
+		U+2193, U+2212, U+2215;
+}
 
 :root {
-	--bg: #f2ede2;
-	--paper: #fbf6ec;
-	--paper-2: #fff9ef;
-	--ink: #14110f;
-	--ink-soft: #46403a;
-	--muted: #8a8073;
-	--line: #d8ccb8;
-	--red: #cf2029;
-	--red-deep: #a5161d;
-	--cyan: #14b1a1;
-	--cyan-ink: #0a5a52;
-	--code-bg: #17130e;
-	--code-ink: #f2e8d6;
+	/* --- surface / ink --- */
+	--cream: #f4efe1; /* page background */
+	--cream-lit: #faf6ec; /* raised panels */
+	--paper: #fffdf7; /* input wells, near-white */
+	--ink: #1c1a17; /* near-black — pixel outlines + text */
+	--ink-2: #45403a; /* secondary text */
+	--muted: #6f6656; /* captions — darkened to clear WCAG AA (~5:1) on cream */
+	--line: #e2dac6; /* soft dividers */
 
-	--shadow: 6px 6px 0 var(--ink);
-	--shadow-sm: 3px 3px 0 var(--ink);
-	--radius: 4px;
+	/* --- accents (each has ONE job) --- */
+	--red: #e5352b; /* actions + warnings + VOID */
+	--red-deep: #b3231b; /* 3d lip / pressed / hover */
+	--teal: #2ba88d; /* agent + success + links */
+	--teal-deep: #1c7a64;
+	--yellow: #f4c22b; /* small warm accents, tape label */
+	--yellow-deep: #d69e1a;
 
-	--mono: ui-monospace, "SFMono-Regular", "JetBrains Mono", Menlo, Consolas,
-		"Liberation Mono", monospace;
-	--sans: "PingFang SC", "Hiragino Sans GB", ui-sans-serif, system-ui,
-		-apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif;
-	/* heavy display stack for the hero URL (condensed grotesque feel) */
-	--display: "Arial Black", "Helvetica Neue", "PingFang SC", ui-sans-serif,
-		system-ui, sans-serif;
+	/* --- pixel world --- */
+	--grass: #62bd4d;
+	--grass-deep: #3f8f36;
+	--dirt: #9c6238;
+	--dirt-deep: #6f4327;
+
+	/* --- structure --- */
+	--stroke: 2.5px; /* standard pixel outline */
+	--radius: 9px; /* chunky rounded-pixel corners */
+	--radius-sm: 5px;
+
+	/* --- type --- */
+	--fp: 'Pixelify Sans', 'Silkscreen', ui-monospace, monospace; /* pixel latin */
+	--fm: ui-monospace, 'SFMono-Regular', 'JetBrains Mono', Menlo, Consolas,
+		'Liberation Mono', monospace; /* readable content */
+	--fs: 'PingFang SC', 'Hiragino Sans GB', 'Source Han Sans SC',
+		'Microsoft YaHei', ui-sans-serif, system-ui, -apple-system, sans-serif;
 }
 
 * {
@@ -42,14 +62,18 @@ body {
 	margin: 0;
 	min-height: 100dvh;
 	color: var(--ink);
-	font-family: var(--sans);
+	font-family: var(--fs);
+	font-weight: 500;
 	line-height: 1.6;
-	background-color: var(--bg);
-	background-image:
-		linear-gradient(rgba(20, 17, 15, 0.04) 1px, transparent 1px),
-		linear-gradient(90deg, rgba(20, 17, 15, 0.04) 1px, transparent 1px);
-	background-size: 26px 26px;
+	background-color: var(--cream);
+	/* faint pixel-grid tooth — barely there, keeps cream from feeling dead */
+	background-image: radial-gradient(
+		rgba(28, 26, 23, 0.045) 1px,
+		transparent 1.4px
+	);
+	background-size: 22px 22px;
 	-webkit-font-smoothing: antialiased;
+	text-rendering: optimizeLegibility;
 }
 
 a {
@@ -57,67 +81,181 @@ a {
 	text-underline-offset: 3px;
 }
 
-/* --- shared primitives (global so components can lean on them) --- */
-
-.pc-mono {
-	font-family: var(--mono);
+h1,
+h2,
+h3 {
+	font-weight: 800;
+	letter-spacing: -0.01em;
 }
 
-.pc-panel {
-	border: 2px solid var(--ink);
-	background: var(--paper);
-	box-shadow: var(--shadow);
+/* Pixel art / sprites must never blur when scaled */
+.px-crisp {
+	image-rendering: pixelated;
+	image-rendering: crisp-edges;
 }
 
-.pc-chip {
+/* ---------- shared pixel primitives ---------- */
+
+/* Latin pixel type. Chinese inside will fall through to --fs automatically
+   via the font stack, but callers should wrap latin-only strings in .px. */
+.px {
+	font-family: var(--fp);
+	letter-spacing: 0.02em;
+}
+
+/* Chunky rounded-pixel panel */
+.px-panel {
+	border: var(--stroke) solid var(--ink);
+	border-radius: var(--radius);
+	background: var(--cream-lit);
+}
+
+/* Small machine-label chip */
+.px-chip {
 	display: inline-flex;
 	align-items: center;
 	gap: 0.4em;
-	border: 1.5px solid var(--ink);
-	background: var(--paper-2);
-	padding: 0.28rem 0.55rem;
-	font-family: var(--mono);
+	border: 2px solid var(--ink);
+	border-radius: var(--radius-sm);
+	background: var(--cream-lit);
+	padding: 0.28rem 0.5rem;
+	font-family: var(--fp);
 	font-size: 0.72rem;
-	font-weight: 700;
-	letter-spacing: 0.02em;
 	line-height: 1;
 	white-space: nowrap;
 }
-
-.pc-chip.is-red {
+.px-chip.is-teal {
+	background: var(--teal);
+	border-color: var(--teal-deep);
+	color: #eafff9;
+}
+.px-chip.is-red {
 	background: var(--red);
 	border-color: var(--red-deep);
 	color: #fff;
 }
-
-.pc-chip.is-cyan {
-	background: var(--cyan);
-	border-color: var(--cyan-ink);
-	color: #06231f;
+.px-chip.is-yellow {
+	background: var(--yellow);
+	border-color: var(--yellow-deep);
+	color: #3a2c05;
 }
 
-.pc-dot {
-	width: 7px;
-	height: 7px;
-	border-radius: 50%;
-	background: var(--cyan);
-	box-shadow: 0 0 0 2px rgba(20, 177, 161, 0.25);
+/* status dot */
+.px-dot {
+	width: 8px;
+	height: 8px;
+	border: 1.5px solid currentColor;
+	background: currentColor;
 	display: inline-block;
+	flex: none;
 }
 
-/* screentone accent — apply as a background layer on any element */
-.pc-tone {
-	background-image: radial-gradient(
-		var(--tone-color, rgba(20, 17, 15, 0.16)) 1px,
-		transparent 1.5px
-	);
-	background-size: 6px 6px;
+/* ---------- chunky 3d pixel button ---------- */
+.px-btn {
+	--btn-face: var(--cream-lit);
+	--btn-lip: var(--ink);
+	--btn-fg: var(--ink);
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 0.5rem;
+	border: var(--stroke) solid var(--ink);
+	border-radius: var(--radius);
+	background: var(--btn-face);
+	color: var(--btn-fg);
+	font-family: var(--fs);
+	font-weight: 800;
+	font-size: 1rem;
+	padding: 0.7rem 1.2rem;
+	text-decoration: none; /* used as both <button> and <a>; never a link underline */
+	cursor: pointer;
+	box-shadow: 0 4px 0 var(--btn-lip);
+	transition:
+		transform 0.05s ease,
+		box-shadow 0.05s ease,
+		filter 0.12s ease;
+	-webkit-tap-highlight-color: transparent;
+}
+.px-btn:hover:not(:disabled) {
+	filter: brightness(1.04);
+}
+.px-btn:active:not(:disabled) {
+	transform: translateY(3px);
+	box-shadow: 0 1px 0 var(--btn-lip);
+}
+.px-btn:disabled {
+	opacity: 0.42;
+	cursor: not-allowed;
+	box-shadow: 0 4px 0 var(--btn-lip);
+}
+.px-btn:focus-visible {
+	outline: 3px solid var(--teal);
+	outline-offset: 2px;
+}
+
+.px-btn.is-red {
+	--btn-face: var(--red);
+	--btn-lip: var(--red-deep);
+	--btn-fg: #fff;
+}
+.px-btn.is-teal {
+	--btn-face: var(--teal);
+	--btn-lip: var(--teal-deep);
+	--btn-fg: #f2fffb;
+}
+.px-btn.is-yellow {
+	--btn-face: var(--yellow);
+	--btn-lip: var(--yellow-deep);
+	--btn-fg: #3a2c05;
+}
+
+/* pixel-font sub-label that rides under a Chinese button label */
+.px-sub {
+	font-family: var(--fp);
+	font-size: 0.7em;
+	letter-spacing: 0.06em;
+	opacity: 0.9;
+}
+
+/* inputs share the pixel-well look */
+.px-well {
+	width: 100%;
+	border: var(--stroke) solid var(--ink);
+	border-radius: var(--radius-sm);
+	background: var(--paper);
+	padding: 0.6rem 0.7rem;
+	font-family: var(--fs);
+	font-size: 0.95rem;
+	color: var(--ink);
+}
+.px-well:focus {
+	outline: 3px solid var(--teal);
+	outline-offset: 1px;
+}
+.px-well:disabled {
+	opacity: 0.55;
+}
+
+/* twinkle for sparkles — one ambient motion, kept tiny */
+@keyframes px-twinkle {
+	0%,
+	100% {
+		opacity: 0.35;
+		transform: scale(0.82);
+	}
+	50% {
+		opacity: 1;
+		transform: scale(1);
+	}
 }
 
 @media (prefers-reduced-motion: reduce) {
-	* {
+	*,
+	*::before,
+	*::after {
 		animation-duration: 0.001ms !important;
 		animation-iteration-count: 1 !important;
 		transition-duration: 0.001ms !important;
+		scroll-behavior: auto !important;
 	}
 }

@@ -1,24 +1,37 @@
 <script lang="ts">
 	import type { PageData } from './$types';
-	import CapsuleCard from '$lib/components/CapsuleCard.svelte';
+	import VoidScene from '$lib/components/VoidScene.svelte';
+	import TapeCta from '$lib/components/TapeCta.svelte';
+	import { t } from '$lib/i18n.svelte';
 
 	let { data }: { data: PageData } = $props();
 	let copied = $state('');
 
-	// delete-with-token: only the creator (who kept the token) can delete
+	// delete-with-token: only the creator (who kept the token) can delete.
 	let token = $state('');
 	let deleting = $state(false);
 	let viewDeleted = $state(false);
 	let delErr = $state('');
 
-	function ttlLabel(expiresAt: string): string {
-		const ms = new Date(expiresAt).getTime() - Date.now();
-		if (ms <= 0) return '0';
-		const h = ms / 3_600_000;
-		if (h >= 24) return `${Math.round(h / 24)}D`;
-		if (h >= 1) return `${Math.round(h)}H`;
-		return `${Math.max(1, Math.round(ms / 60_000))}M`;
-	}
+	// live countdown to expiry (client only, so no SSR time mismatch)
+	let now = $state<number | null>(null);
+	$effect(() => {
+		now = Date.now();
+		const id = setInterval(() => (now = Date.now()), 1000);
+		return () => clearInterval(id);
+	});
+	const remaining = $derived.by(() => {
+		if (now === null) return '';
+		const ms = new Date(data.expiresAt).getTime() - now;
+		if (ms <= 0) return '00:00:00';
+		const t = Math.floor(ms / 1000);
+		const d = Math.floor(t / 86400);
+		const h = Math.floor((t % 86400) / 3600);
+		const m = Math.floor((t % 3600) / 60);
+		const s = t % 60;
+		const p = (n: number) => String(n).padStart(2, '0');
+		return d > 0 ? `${d}天 ${p(h)}:${p(m)}:${p(s)}` : `${p(h)}:${p(m)}:${p(s)}`;
+	});
 
 	async function copy(text: string, which: string) {
 		await navigator.clipboard.writeText(text);
@@ -40,10 +53,10 @@
 				viewDeleted = true;
 			} else {
 				const d = await res.json();
-				delErr = res.status === 403 ? '删除令牌不正确' : (d.error ?? '删除失败');
+				delErr = res.status === 403 ? t('v_del_wrong') : (d.message ?? d.error ?? t('v_del_fail'));
 			}
 		} catch {
-			delErr = '网络错误';
+			delErr = t('v_net_err');
 		} finally {
 			deleting = false;
 		}
@@ -51,145 +64,152 @@
 </script>
 
 <svelte:head>
-	<title>{data.title ?? '提示词胶囊'} · Prompt Capsule</title>
+	<title>{data.title ?? '提示词卡带'} · Prompt Tape</title>
 	<meta name="robots" content="noindex" />
 </svelte:head>
 
 <main class="page">
 	{#if data.active}
-		<div class="grid">
-			<div class="hero-col">
-				<CapsuleCard
-					urlText={data.display}
-					slug={data.slug}
-					title={data.title}
-					ttlLabel={ttlLabel(data.expiresAt)}
-					seal={true}
-				/>
-				<div class="hero-actions">
-					<button class="act primary" onclick={() => copy(data.agentText, 'agent')}>
-						<span class="ai">›_</span>
-						{copied === 'agent' ? '✔ 已复制，粘给 AI 就行' : '复制给 AI 用'}
-					</button>
-					<button class="act" onclick={() => copy(data.content ?? '', 'content')}>
-						{copied === 'content' ? '✔ 原文已复制' : '复制原文'}
-					</button>
-				</div>
-				<p class="raw pc-mono">
-					纯文本地址（给 AI 读取）：<code>{data.display}</code>
-				</p>
+		<!-- HERO: integrated pixel illustration + live text overlays -->
+		<div class="hero">
+			<img src="/sprites/n78/view-hero.png" alt="一盘正在播放的提示词卡带" />
+			<span class="vh-title" data-clarity-mask="true">{t('v_now_playing')}{data.title || t('v_untitled')}</span>
+			<span class="vh-url px">{data.display}</span>
+			<span class="vh-time px">{remaining || '—'}</span>
+		</div>
+
+		<!-- CONTENT -->
+		<section class="panel">
+			<div class="panel-head">
+				<span class="ph-title">
+					<svg class="file-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 2h9l4 4v16H6z" fill="var(--teal)" stroke="var(--ink)" stroke-width="2" stroke-linejoin="round"/><path d="M9 12h7M9 16h7M9 8h3" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg>
+					{t('v_panel')}
+				</span>
+				<span class="ph-mode px">TEXT/PLAIN</span>
 			</div>
+			<pre class="content" data-clarity-mask="true">{data.content}</pre>
+		</section>
 
-			<div class="body-col">
-				<div class="panel">
-					<div class="panel-head">
-						<span class="ph-title pc-mono">■ 原文内容 · PLAIN TEXT</span>
-						<span class="ph-mode pc-mono">到期 {new Date(data.expiresAt).toLocaleString()}</span>
-					</div>
-					<pre class="content pc-mono">{data.content}</pre>
-				</div>
+		<!-- ACTIONS -->
+		<section class="actions">
+			<button class="px-btn is-teal" onclick={() => copy(data.agentText, 'agent')}>
+				<svg class="ai-i" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="8" width="16" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 8V4M9 13h.01M15 13h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+				{copied === 'agent' ? t('v_copy_agent_done') : t('v_copy_agent')}
+			</button>
+			<button class="px-btn is-yellow" onclick={() => copy(data.content ?? '', 'content')}>
+				<svg class="cp-i" viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M4 16V4h12" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+				{copied === 'content' ? t('v_copy_raw_done') : t('v_copy_raw')}
+			</button>
 
-				<details class="del-box">
-					<summary class="pc-mono">删除这颗胶囊</summary>
-					{#if viewDeleted}
-						<p class="done pc-mono">✔ 已删除。刷新后此页将不再可用。</p>
-					{:else}
-						<p class="hint">粘贴创建时给你的删除口令：</p>
-						<div class="del-row">
-							<input bind:value={token} placeholder="delete token" class="pc-mono" />
-							<button class="del" onclick={doDelete} disabled={deleting || token.trim() === ''}>
-								{deleting ? '删除中…' : '确认删除'}
-							</button>
-						</div>
-						{#if delErr}<p class="err pc-mono">! {delErr}</p>{/if}
-					{/if}
-				</details>
-
-				<a class="mk-own" href="/">封一颗自己的胶囊 →</a>
+			<div class="del">
+				<span class="del-lab">{t('v_del_label')}</span>
+				{#if viewDeleted}
+					<span class="del-done px">DELETED ✔</span>
+				{:else}
+					<input
+						class="px-well"
+						bind:value={token}
+						placeholder={t('v_del_ph')}
+						aria-label={t('v_del_label')}
+					/>
+					<button
+						class="trash"
+						onclick={doDelete}
+						disabled={deleting || token.trim() === ''}
+						aria-label={t('v_cta')}
+						title={t('v_cta')}
+					>
+						{#if deleting}…{:else}
+							<svg viewBox="0 0 24 24"><path d="M5 7h14M9 7V5h6v2M7 7l1 13h8l1-13" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+						{/if}
+					</button>
+				{/if}
 			</div>
+		</section>
+		{#if delErr}<p class="err px">! {delErr}</p>{/if}
+
+		<!-- MAKE YOUR OWN -->
+		<div class="make-wrap">
+			<TapeCta label={t('v_cta')} sub="MAKE YOUR OWN TAPE" href="/" />
 		</div>
 	{:else}
-		<div class="expired">
-			<CapsuleCard
-				urlText={data.display}
-				slug={data.slug}
-				title={data.title}
-				ttlLabel="0"
-				tone="dead"
-			/>
-			<h1>胶囊已过期或已删除</h1>
-			<p>这颗胶囊不再可用。它的内容在到期时被清除，这正是短期封装的意义。</p>
-			<a class="mk-own" href="/">封一颗新的 →</a>
-		</div>
+		<!-- EXPIRED / VOID (content 已清除) -->
+		<VoidScene
+			line={t('void_line')}
+			ctaLabel={t('void_cta')}
+			ctaSub="NEW TAPE"
+			ctaHref="/"
+		/>
 	{/if}
 </main>
 
 <style>
 	.page {
-		width: min(1080px, 100%);
+		width: min(880px, 100%);
 		margin: 0 auto;
-		padding: clamp(1.4rem, 4vw, 2.6rem) clamp(1rem, 4vw, 2.2rem) 3rem;
+		padding: clamp(1.2rem, 4vw, 2.4rem) clamp(1rem, 4vw, 2rem) 3rem;
 	}
 
-	.grid {
-		display: grid;
-		grid-template-columns: 0.92fr 1.08fr;
-		gap: clamp(1rem, 2.5vw, 1.6rem);
-		align-items: start;
+	/* ---- hero: illustration + text overlays ----
+	   overlay positions are measured against the cropped hero (1250×503);
+	   font sizes use cqw so text scales + stays pinned to its slot at any width. */
+	.hero {
+		position: relative;
+		width: min(760px, 100%);
+		margin: 0.4rem auto 0;
+		container-type: inline-size;
 	}
-
-	.hero-col {
-		position: sticky;
-		top: 5rem;
+	.hero > img {
+		display: block;
+		width: 100%;
+		height: auto;
 	}
-	.hero-actions {
-		display: grid;
-		grid-template-columns: 1fr;
-		gap: 0.5rem;
-		margin-top: 0.9rem;
+	.vh-title {
+		position: absolute;
+		top: 12.5%;
+		left: 33.3%;
+		transform: translateY(-50%);
+		max-width: 32.5%;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		font-family: var(--fs);
+		font-weight: 800;
+		font-size: 1.82cqw;
+		line-height: 1;
+		color: #5a4708; /* dark brown, reads on the yellow tag */
 	}
-	.act {
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
-		gap: 0.45rem;
-		border: 2px solid var(--ink);
-		background: var(--paper-2);
-		border-radius: var(--radius);
-		padding: 0.6rem 0.8rem;
-		font-size: 0.88rem;
-		font-weight: 700;
-		cursor: pointer;
+	.vh-url {
+		position: absolute;
+		top: 33%;
+		left: 45.5%;
+		transform: translate(-50%, -50%);
+		font-size: 3.1cqw;
+		font-weight: 600;
+		letter-spacing: 0.01em;
 		color: var(--ink);
+		white-space: nowrap;
 	}
-	.act:hover {
-		box-shadow: var(--shadow-sm);
-	}
-	.act.primary {
-		background: var(--ink);
-		color: var(--code-ink);
-	}
-	.act .ai {
-		font-family: var(--mono);
-		color: var(--cyan);
-	}
-	.raw {
-		margin: 0.8rem 0 0;
-		font-size: 0.72rem;
-		color: var(--muted);
-	}
-	.raw code {
-		color: var(--ink);
-		background: var(--paper-2);
-		border: 1px solid var(--line);
-		padding: 0.12rem 0.4rem;
-		word-break: break-all;
+	.vh-time {
+		position: absolute;
+		top: 56.5%;
+		left: 9.8%;
+		transform: translate(-50%, -50%);
+		font-size: 1.72cqw;
+		font-weight: 600;
+		letter-spacing: 0.01em;
+		color: var(--red);
+		white-space: nowrap;
+		font-variant-numeric: tabular-nums;
 	}
 
+	/* ---- content panel ---- */
 	.panel {
-		border: 2px solid var(--ink);
-		background: var(--paper);
-		box-shadow: var(--shadow);
+		margin-top: 1.4rem;
+		border: 2.5px solid var(--ink);
+		border-radius: var(--radius);
+		background: var(--cream-lit);
+		overflow: hidden;
 	}
 	.panel-head {
 		display: flex;
@@ -197,127 +217,127 @@
 		justify-content: space-between;
 		gap: 0.75rem;
 		padding: 0.6rem 0.9rem;
-		border-bottom: 2px solid var(--ink);
-		background: var(--paper-2);
+		border-bottom: 2.5px solid var(--ink);
+		background: var(--paper);
 	}
 	.ph-title {
-		font-size: 0.78rem;
+		display: inline-flex;
+		align-items: center;
+		gap: 0.5rem;
+		font-size: 0.98rem;
 		font-weight: 800;
-		letter-spacing: 0.06em;
+	}
+	.file-i {
+		width: 20px;
+		height: 20px;
 	}
 	.ph-mode {
 		font-size: 0.66rem;
+		letter-spacing: 0.08em;
 		color: var(--muted);
-		letter-spacing: 0.04em;
 	}
 	.content {
 		margin: 0;
-		padding: 1rem;
-		max-height: 62vh;
+		padding: 1rem 1.1rem;
+		max-height: 56vh;
 		overflow: auto;
 		white-space: pre-wrap;
 		word-break: break-word;
-		font-size: 0.84rem;
-		line-height: 1.6;
+		font-family: var(--fm);
+		font-size: 0.86rem;
+		line-height: 1.7;
 		color: var(--ink);
 		background: var(--paper);
 	}
 
-	.del-box {
-		margin-top: 1rem;
-		border: 1.5px dashed var(--line);
-		padding: 0.6rem 0.8rem;
-		font-size: 0.88rem;
-	}
-	.del-box summary {
-		cursor: pointer;
-		color: var(--muted);
-		font-size: 0.74rem;
-		font-weight: 700;
-		letter-spacing: 0.04em;
-	}
-	.del-box summary:hover {
-		color: var(--red);
-	}
-	.hint {
-		color: var(--muted);
-		font-size: 0.78rem;
-		margin: 0.6rem 0 0.4rem;
-	}
-	.del-row {
+	/* ---- actions ---- */
+	.actions {
 		display: flex;
-		gap: 0.5rem;
 		flex-wrap: wrap;
+		align-items: stretch;
+		gap: 0.6rem;
+		margin-top: 1rem;
 	}
-	.del-row input {
-		flex: 1;
-		min-width: 200px;
-		border: 2px solid var(--ink);
-		border-radius: var(--radius);
-		padding: 0.5rem 0.6rem;
-		font-size: 0.8rem;
-		background: var(--paper-2);
-		color: var(--ink);
+	.actions .px-btn {
+		font-size: 0.92rem;
+		padding: 0.6rem 0.9rem;
+	}
+	.ai-i,
+	.cp-i {
+		width: 18px;
+		height: 18px;
 	}
 	.del {
-		border: 2px solid var(--red-deep);
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		flex: 1;
+		min-width: 240px;
+		padding-left: 0.6rem;
+		border-left: 2.5px dashed var(--line);
+	}
+	.del-lab {
+		font-size: 0.8rem;
+		font-weight: 700;
+		color: var(--ink-2);
+		white-space: nowrap;
+	}
+	.del .px-well {
+		flex: 1;
+		min-width: 90px;
+		font-size: 0.8rem;
+		padding: 0.5rem 0.6rem;
+	}
+	.del-done {
+		color: var(--teal-deep);
+		font-size: 0.82rem;
+	}
+	.trash {
+		display: grid;
+		place-items: center;
+		width: 42px;
+		height: 42px;
+		flex: none;
+		border: 2.5px solid var(--red-deep);
+		border-radius: var(--radius-sm);
+		background: var(--cream-lit);
+		color: var(--red);
+		cursor: pointer;
+		box-shadow: 0 3px 0 var(--red-deep);
+	}
+	.trash svg {
+		width: 20px;
+		height: 20px;
+	}
+	.trash:hover:not(:disabled) {
 		background: var(--red);
 		color: #fff;
-		border-radius: var(--radius);
-		padding: 0.5rem 0.9rem;
-		font-weight: 700;
-		cursor: pointer;
 	}
-	.del:disabled {
-		opacity: 0.45;
+	.trash:active:not(:disabled) {
+		transform: translateY(3px);
+		box-shadow: none;
+	}
+	.trash:disabled {
+		opacity: 0.4;
 		cursor: not-allowed;
 	}
 	.err {
+		margin: 0.5rem 0 0;
 		color: var(--red-deep);
-		font-size: 0.78rem;
-		margin-top: 0.4rem;
-		font-weight: 700;
-	}
-	.done {
-		color: var(--cyan-ink);
-		font-size: 0.85rem;
-		margin-top: 0.5rem;
+		font-size: 0.82rem;
 		font-weight: 700;
 	}
 
-	.mk-own {
-		display: inline-block;
-		margin-top: 1.1rem;
-		font-weight: 700;
-		font-size: 0.9rem;
-		color: var(--red);
-		text-decoration: none;
-	}
-	.mk-own:hover {
-		text-decoration: underline;
+	/* ---- make your own ---- */
+	.make-wrap {
+		margin-top: 1.2rem;
 	}
 
-	.expired {
-		max-width: 480px;
-		margin: 2rem auto;
-		text-align: center;
-	}
-	.expired h1 {
-		margin: 1.4rem 0 0.5rem;
-		font-size: 1.4rem;
-	}
-	.expired p {
-		color: var(--ink-soft);
-		font-size: 0.92rem;
-		margin: 0;
-	}
-
-	@media (max-width: 820px) {
-		.grid {
-			grid-template-columns: 1fr;
-		}
-		.hero-col {
-			position: static;
+	@media (max-width: 640px) {
+		.del {
+			border-left: none;
+			padding-left: 0;
+			flex-basis: 100%;
 		}
 	}
 </style>
