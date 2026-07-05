@@ -184,6 +184,11 @@
 			<span class="sep">text/plain · n78.xyz</span>
 		</div>
 		<p class="disclaimer">{t('disclaimer')}</p>
+		<p class="icp">
+			<a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer"
+				>备案号</a
+			>
+		</p>
 	</footer>
 </div>
 
@@ -425,6 +430,19 @@
 		font-size: 0.64rem;
 		line-height: 1.6;
 		color: rgba(244, 239, 225, 0.5);
+	}
+	.icp {
+		margin: 0.5rem 0 0;
+		font-size: 0.64rem;
+		letter-spacing: 0.03em;
+	}
+	.icp a {
+		color: rgba(244, 239, 225, 0.55);
+		text-decoration: none;
+	}
+	.icp a:hover {
+		color: var(--cream);
+		text-decoration: underline;
 	}
 
 	@media (max-width: 560px) {
