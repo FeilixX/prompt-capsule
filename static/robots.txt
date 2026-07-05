@@ -1,3 +1,11 @@
-# allow crawling everything by default
+# Prompt Tape — crawlers welcome, AI answer engines included.
+# We WANT to be cited by ChatGPT, Claude, Perplexity, and Google AI. No AI-bot blocks.
+# Excluded: ephemeral user-recorded capsules (they expire) and machine endpoints.
+
 User-agent: *
-Disallow:
+Allow: /
+Disallow: /c/
+Disallow: /view/
+Disallow: /api/
+
+Sitemap: https://n78.xyz/sitemap.xml

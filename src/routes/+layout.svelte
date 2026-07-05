@@ -6,9 +6,67 @@
 	import { onMount } from 'svelte';
 	import { dev } from '$app/environment';
 	import { env } from '$env/dynamic/public';
+	import { page } from '$app/state';
 
 	let { children } = $props();
 	let showPolicy = $state(false);
+
+	// --- GEO / social ---
+	const SITE = 'https://n78.xyz';
+	const canonical = $derived(`${SITE}${page.url.pathname}`);
+	const OG_TITLE = '提示词卡带 · Prompt Tape';
+	const OG_DESC =
+		'把一段提示词 / system prompt / 长指令封成一次性 URL，任何 AI agent 直接 fetch 就能照着执行；人也能看。短期有效，带删除口令。';
+
+	const LD_APP = JSON.stringify({
+		'@context': 'https://schema.org',
+		'@type': 'SoftwareApplication',
+		name: 'Prompt Tape / 提示词卡带',
+		url: SITE,
+		applicationCategory: 'DeveloperApplication',
+		operatingSystem: 'Web',
+		description:
+			'Seal a prompt, system prompt, or long instruction into a one-time URL that any AI agent can fetch and run.',
+		offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
+		isAccessibleForFree: true,
+		featureList: [
+			'Seal a prompt into a shareable text/plain URL',
+			'Remote MCP server with create/read/delete tools',
+			'HTTP API',
+			'Auto-expiry up to 7 days',
+			'Delete key'
+		]
+	});
+	const LD_FAQ = JSON.stringify({
+		'@context': 'https://schema.org',
+		'@type': 'FAQPage',
+		mainEntity: [
+			{
+				'@type': 'Question',
+				name: 'What is Prompt Tape?',
+				acceptedAnswer: {
+					'@type': 'Answer',
+					text: 'Prompt Tape seals a prompt, system prompt, or long instruction into a one-time URL. The link returns plain text any AI agent can fetch and run; humans can read it too.'
+				}
+			},
+			{
+				'@type': 'Question',
+				name: 'How do I use Prompt Tape with an AI agent?',
+				acceptedAnswer: {
+					'@type': 'Answer',
+					text: 'Add the remote MCP endpoint https://n78.xyz/mcp to Claude, Cursor, or any MCP client, then ask your agent to seal text into a tape. Or POST to https://n78.xyz/api/capsules and share the returned URL.'
+				}
+			},
+			{
+				'@type': 'Question',
+				name: 'How long does a prompt tape last?',
+				acceptedAnswer: {
+					'@type': 'Answer',
+					text: 'Up to 7 days — 1 hour, 1 day, or 7 days. Each tape carries a delete key so you can remove it anytime.'
+				}
+			}
+		]
+	});
 
 	// Microsoft Clarity — anonymous usage stats + heatmaps. Prompt content and the
 	// delete token are masked (inputs auto-mask; the non-input prompt/title/token
@@ -43,7 +101,30 @@
 </script>
 
 <svelte:head>
+	<link rel="canonical" href={canonical} />
 	<link rel="icon" href={favicon} />
+	<link rel="icon" href="/favicon.ico" sizes="any" />
+
+	<meta property="og:type" content="website" />
+	<meta property="og:site_name" content="Prompt Tape / 提示词卡带" />
+	<meta property="og:title" content={OG_TITLE} />
+	<meta property="og:description" content={OG_DESC} />
+	<meta property="og:url" content={canonical} />
+	<meta property="og:image" content="{SITE}/og.png" />
+	<meta property="og:image:width" content="1200" />
+	<meta property="og:image:height" content="630" />
+	<meta property="og:locale" content="zh_CN" />
+	<meta property="og:locale:alternate" content="en_US" />
+
+	<meta name="twitter:card" content="summary_large_image" />
+	<meta name="twitter:title" content={OG_TITLE} />
+	<meta name="twitter:description" content={OG_DESC} />
+	<meta name="twitter:image" content="{SITE}/og.png" />
+
+	<!-- eslint-disable-next-line svelte/no-at-html-tags -->
+	{@html `<script type="application/ld+json">${LD_APP}</script>`}
+	<!-- eslint-disable-next-line svelte/no-at-html-tags -->
+	{@html `<script type="application/ld+json">${LD_FAQ}</script>`}
 </svelte:head>
 
 <div class="shell">
