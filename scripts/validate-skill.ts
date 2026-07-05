@@ -1,10 +1,10 @@
 /// <reference types="bun" />
-// 校验 skills/xhs/ 包:SKILL.md frontmatter(name/description)、单文件 ≤10MB、总 ≤30MB。
+// 校验 skills/prompt-tape/ 包:SKILL.md frontmatter(name/description)、单文件 ≤10MB、总 ≤30MB。
 export {};
 import { readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
-const dir = 'skills/xhs';
+const dir = 'skills/prompt-tape';
 let fail = 0;
 const bad = (m: string) => {
 	console.error(`FAIL: ${m}`);
@@ -34,5 +34,5 @@ for (const f of readdirSync(dir)) {
 }
 if (total > 30 * 1024 * 1024) bad(`包总大小 > 30MB (${total})`);
 
-if (fail === 0) console.log(`PASS: skills/xhs 校验通过 (总 ${(total / 1024).toFixed(1)}KB)`);
+if (fail === 0) console.log(`PASS: skills/prompt-tape 校验通过 (总 ${(total / 1024).toFixed(1)}KB)`);
 process.exit(fail === 0 ? 0 : 1);

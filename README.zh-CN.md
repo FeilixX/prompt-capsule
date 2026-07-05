@@ -134,7 +134,7 @@ curl -X POST https://n78.xyz/api/capsules/a8K2mQp9/delete \
 | `read_prompt_tape` | `target`(slug 或 URL) | 卡带正文 |
 | `delete_prompt_tape` | `slug`、`delete_token` | `deleted` |
 
-契约与 HTTP API 一致(`content` ≤ 16 KB,`ttl_seconds` ≤ 7 天)。封装成小红书 Skill 的包在 [`skills/xhs/`](skills/xhs/)。
+契约与 HTTP API 一致(`content` ≤ 16 KB,`ttl_seconds` ≤ 7 天)。封装成可安装 Skill 的包在 [`skills/prompt-tape/`](skills/prompt-tape/),安装与用法见 [n78.xyz/skill](https://n78.xyz/skill)。
 
 ## 配置
 

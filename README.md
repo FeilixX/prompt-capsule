@@ -133,7 +133,7 @@ Tools:
 | `read_prompt_tape` | `target` (slug or URL) | the capsule text |
 | `delete_prompt_tape` | `slug`, `delete_token` | `deleted` |
 
-Same contract as the HTTP API (`content` ≤ 16 KB, `ttl_seconds` ≤ 7 days). A Xiaohongshu Skill package that wraps this lives in [`skills/xhs/`](skills/xhs/).
+Same contract as the HTTP API (`content` ≤ 16 KB, `ttl_seconds` ≤ 7 days). An installable Skill package that wraps this lives in [`skills/prompt-tape/`](skills/prompt-tape/) — install & usage guide at [n78.xyz/skill](https://n78.xyz/skill).
 
 ## Configuration
 
