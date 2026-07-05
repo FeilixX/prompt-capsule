@@ -113,6 +113,28 @@ curl -X POST https://n78.xyz/api/capsules/a8K2mQp9/delete \
   -d '{"delete_token":"…"}'
 ```
 
+## MCP
+
+A remote [MCP](https://modelcontextprotocol.io) server is served at **`https://n78.xyz/mcp`** (Streamable HTTP, stateless). Add it to any MCP client (Claude, Cursor, …) — zero install, just the URL:
+
+```json
+{
+  "mcpServers": {
+    "prompt-tape": { "url": "https://n78.xyz/mcp" }
+  }
+}
+```
+
+Tools:
+
+| Tool | Args | Returns |
+|------|------|---------|
+| `create_prompt_tape` | `content`, `title?`, `ttl_seconds?` | `view_url`, `raw_url`, `delete_token`, `expires_at`, `agent_text` |
+| `read_prompt_tape` | `target` (slug or URL) | the capsule text |
+| `delete_prompt_tape` | `slug`, `delete_token` | `deleted` |
+
+Same contract as the HTTP API (`content` ≤ 16 KB, `ttl_seconds` ≤ 7 days). A Xiaohongshu Skill package that wraps this lives in [`skills/xhs/`](skills/xhs/).
+
 ## Configuration
 
 Everything is env-driven — see [`.env.example`](.env.example):

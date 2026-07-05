@@ -114,6 +114,28 @@ curl -X POST https://n78.xyz/api/capsules/a8K2mQp9/delete \
   -d '{"delete_token":"…"}'
 ```
 
+## 用 MCP 接入
+
+远程 [MCP](https://modelcontextprotocol.io) 服务挂在 **`https://n78.xyz/mcp`**(Streamable HTTP,无状态)。任何 MCP 客户端(Claude、Cursor 等)填一个 URL 即用,零安装：
+
+```json
+{
+  "mcpServers": {
+    "prompt-tape": { "url": "https://n78.xyz/mcp" }
+  }
+}
+```
+
+工具：
+
+| 工具 | 参数 | 返回 |
+|------|------|------|
+| `create_prompt_tape` | `content`、`title?`、`ttl_seconds?` | `view_url`、`raw_url`、`delete_token`、`expires_at`、`agent_text` |
+| `read_prompt_tape` | `target`(slug 或 URL) | 卡带正文 |
+| `delete_prompt_tape` | `slug`、`delete_token` | `deleted` |
+
+契约与 HTTP API 一致(`content` ≤ 16 KB,`ttl_seconds` ≤ 7 天)。封装成小红书 Skill 的包在 [`skills/xhs/`](skills/xhs/)。
+
 ## 配置
 
 全走环境变量 —— 见 [`.env.example`](.env.example)：
