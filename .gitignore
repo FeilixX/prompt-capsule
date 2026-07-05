@@ -42,3 +42,6 @@ renders/
 
 # Local AI assistant config
 .claude/
+
+# internal planning docs (specs/plans/reviews) — local only, not public
+docs/superpowers/
