@@ -69,7 +69,7 @@ export function createCapsuleFromInput(
 
 	const url = `${config.publicBaseUrl}${config.routePrefix}/${capsule.slug}`;
 	const viewUrl = `${config.publicBaseUrl}/view/${capsule.slug}`;
-	// display: protocol-stripped for the human-facing 小红书 headline (short, non-spammy).
+	// display: protocol-stripped for the human-facing share headline (short, non-spammy).
 	// agent_text keeps the full URL (scheme included) — a machine consumer needs a directly-fetchable URL.
 	const display = url.replace(/^https?:\/\//, '');
 

@@ -39,3 +39,6 @@ vite.config.ts.timestamp-*
 # Working scratch (design mocks, renders, screenshots, image-slice source)
 renders/
 /visual-system-*.html
+
+# Local AI assistant config
+.claude/

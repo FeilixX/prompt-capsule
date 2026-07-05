@@ -1,4 +1,4 @@
--- Capsules schema — v1 (lean; no pool/moderation columns until ROOT-v1 step 4).
+-- Capsules table schema.
 --
 -- CANONICAL SOURCE: src/lib/server/capsules.ts (SCHEMA_SQL) — the app applies that on init.
 -- This file mirrors it for ops / manual inspection (e.g. `sqlite3 data/capsules.db < db/schema.sql`).

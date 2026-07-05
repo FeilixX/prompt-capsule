@@ -1,40 +1,128 @@
-# 提示词胶囊 / Prompt Capsule
+<div align="center">
 
-Prompt Capsule is a short-lived `text/plain` URL for long prompts and agent instructions.
+<img src="static/sprites/n78/hero.png" alt="Prompt Tape" width="620" />
 
-它把小红书、X、教程文章里不适合直接展示的长 prompt / agent workflow 封装成一个短链接，例如:
+# Prompt Tape · 提示词卡带
 
-```text
-n78.xyz/c/abc123
+**Seal a long prompt into a short, plain-text link.**
+
+Copy one link, hand it to your AI — it opens the link and runs. Short-lived by design.
+
+[![license](https://img.shields.io/badge/license-MIT-1c1a17)](LICENSE)
+[![SvelteKit](https://img.shields.io/badge/SvelteKit-5-FF3E00?logo=svelte&logoColor=white)](https://svelte.dev/)
+[![Bun](https://img.shields.io/badge/Bun-runtime-14151a?logo=bun&logoColor=white)](https://bun.sh/)
+[![SQLite](https://img.shields.io/badge/SQLite-bun%3Asqlite-003B57?logo=sqlite&logoColor=white)](https://bun.sh/docs/api/sqlite)
+
+</div>
+
+---
+
+## Why
+
+Long prompts are annoying to share. Pasting a 2,000-character instruction into a chat, a ticket, or another agent is clumsy and lossy.
+
+Prompt Tape "records" a prompt onto a **tape** — a short link that serves the raw text as `text/plain`. A human copies one link; an AI agent fetches that link and reads the exact bytes. When the tape expires, the content is gone. That short life is the point: no growing pile of stale prompts.
+
+## How it works
+
+1. **Paste** your prompt — any length, any format.
+2. **Record** it. You get a link like `n78.xyz/c/a8K2mQp9`.
+3. **Hand it to your AI.** A `GET` on that link returns your prompt as plain text. Codex, Claude, 豆包, whatever — it opens and runs.
+
+Every tape has two URLs:
+
+| URL | For | Serves |
+| --- | --- | --- |
+| `…/c/{slug}` | machines | the raw prompt, `text/plain; charset=utf-8` |
+| `…/view/{slug}` | humans | a page to read, copy, and delete it |
+
+## Features
+
+- **Plain text, agent-first.** `/c/{slug}` is a clean `text/plain` endpoint — no HTML, no JS, nothing to scrape.
+- **Short-lived.** 1 hour / 1 day / 7 days, then auto-cleared. Not a database of forever-prompts.
+- **Delete key.** Each tape gets a one-time delete token; only the holder can kill it early.
+- **No accounts.** Anonymous create, rate-limited.
+- **Private by default.** Content lives server-side, is never indexed (`noindex`), and is never used for training.
+- **Bilingual UI** (中文 / English) with a one-click toggle.
+
+## Tech
+
+- [SvelteKit](https://svelte.dev/) (Svelte 5 runes) + `adapter-node`
+- [Bun](https://bun.sh/) runtime, `bun:sqlite` for storage
+- [Zod](https://zod.dev/) for input validation
+- Optional [Microsoft Clarity](https://clarity.microsoft.com/) analytics — prompt content and delete tokens are masked, so nothing sensitive is ever uploaded
+
+## Quickstart
+
+```bash
+bun install
+cp .env.example .env      # defaults work for local
+bun run dev               # → http://localhost:5173
 ```
 
-人可以打开复制原文，Codex / Claude / Cursor 也可以直接读取这个 URL 并按内容执行。
+Production:
 
-## Product Direction
+```bash
+bun run build             # adapter-node → build/
+bun run start             # serves build/index.js
+```
 
-This repo is currently in product definition stage.
+Checks:
 
-The core thesis is not "pastebin for prompts." It is an agent-native content primitive:
+```bash
+bun test                  # unit + integration
+bun run check             # svelte-check + types
+BASE=http://localhost:5173 bun scripts/smoke.ts   # end-to-end
+```
 
-- creators publish a tiny URL instead of a fragile long prompt;
-- readers get reliable plain text instead of screenshot OCR;
-- agents can consume the same URL as an executable instruction packet;
-- curated public capsules teach AI beginners that agents can read URLs and work from them.
+## HTTP API
 
-## Key Docs
+**Create** a tape:
 
-- [ROOT-v1.md](./ROOT-v1.md) - **canonical v1 root** (supersedes the Schoolhouse north-star)
-- [PRD-prompt-capsule.md](./PRD-prompt-capsule.md) - backend contract input (URL / API / schema / deploy)
-- [gstack-office-hours-agent-url-schoolhouse.md](./gstack-office-hours-agent-url-schoolhouse.md) - office-hours input; north-star **superseded by ROOT-v1**
-- [hero-visual-research.md](./hero-visual-research.md) - visual research notes
-- [hero-object-prompts.html](./hero-object-prompts.html) - hero object prompt exploration
+```bash
+curl -X POST https://n78.xyz/api/capsules \
+  -H 'content-type: application/json' \
+  -d '{"content":"You are a senior code reviewer...","ttl_seconds":604800}'
+```
 
-## Current Decisions
+```jsonc
+{
+  "slug": "a8K2mQp9",
+  "url": "https://n78.xyz/c/a8K2mQp9",         // raw text/plain
+  "view_url": "https://n78.xyz/view/a8K2mQp9",  // human page
+  "expires_at": "2026-07-12T00:00:00.000Z",
+  "delete_token": "…"                           // keep it to delete early
+}
+```
 
-- The product is a content primitive (a short `text/plain` URL humans copy and agents fetch+execute), not a prompt marketplace, community, or agent-literacy school.
-- v1 proves one thing: **viral spread → someone uses it → willing to reuse (复购)**. Community/pool/curation defer until reuse is proven.
-- `/c/{slug}` stays pure `text/plain; charset=utf-8`.
-- Web utility path (`/new`, `/c`, `/view`) is must-ship; CLI / MCP / skill are fast-follow, not day-one blockers.
-- Pool / moderation / 50 curated seeds are DEFERred, not v1 scope.
-- Privacy language must be honest: anyone with the link can read it.
+**Read** it — this is what an agent does:
 
+```bash
+curl https://n78.xyz/c/a8K2mQp9              # → your prompt, as text/plain
+```
+
+**Delete** it early:
+
+```bash
+curl -X POST https://n78.xyz/api/capsules/a8K2mQp9/delete \
+  -H 'content-type: application/json' \
+  -d '{"delete_token":"…"}'
+```
+
+## Configuration
+
+Everything is env-driven — see [`.env.example`](.env.example):
+
+| Var | Default | What |
+| --- | --- | --- |
+| `PUBLIC_BASE_URL` | `https://n78.xyz` | Canonical base for generated links |
+| `ALLOWED_HOSTS` | `n78.xyz` | Hosts allowed to serve capsules |
+| `CAPSULE_ROUTE_PREFIX` | `/c` | Path prefix for the raw endpoint |
+| `MAX_CONTENT_BYTES` | `16384` | Max prompt size (UTF-8 bytes) |
+| `DEFAULT_TTL_SECONDS` / `MAX_TTL_SECONDS` | `604800` | TTL, in seconds (7 days) |
+| `SLUG_LENGTH` | `8` | Base62 slug length |
+| `DB_PATH` | `./data/capsules.db` | SQLite file |
+
+## License
+
+[MIT](LICENSE). Do what you like; no warranty.
