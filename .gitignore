@@ -45,3 +45,6 @@ renders/
 
 # internal planning docs (specs/plans/reviews) — local only, not public
 docs/superpowers/
+
+# local RED-upload bundle — not tracked
+skills/xhs/
