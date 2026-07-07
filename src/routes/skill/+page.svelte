@@ -60,6 +60,18 @@
 			<span class="arrow px" aria-hidden="true">▶</span>
 			<div class="step px-panel"><b>{t('sk_flow3_b')}</b><span class="mono">n78.xyz/c/…</span></div>
 		</div>
+
+		<figure class="urlmap">
+			<div class="umap-track">
+				<span class="useg"><span class="ut mono">https://</span><span class="ul">{t('sk_url_scheme')}</span></span>
+				<span class="useg"><span class="ut mono">n78.xyz</span><span class="ul">{t('sk_url_domain')}</span></span>
+				<span class="useg"><span class="ut mono">/c/</span><span class="ul">{t('sk_url_path')}</span></span>
+				<span class="useg is-code"><span class="ut mono">okIdDdhU</span><span class="ul">{t('sk_url_code')}</span></span>
+			</div>
+			<p class="umap-hint">{t('sk_url_codehint')}</p>
+		</figure>
+		<p class="explain">{t('sk_urlmap_p')}</p>
+
 		<p class="note">{t('sk_note1')}</p>
 	</section>
 
@@ -260,6 +272,72 @@
 		line-height: 1.6;
 		color: var(--ink-2);
 		margin: 0;
+	}
+
+	/* URL anatomy — segmented breakdown; the last cell (卡带码) is the highlight. */
+	.urlmap {
+		/* shrink-wrap the cells + center, so the hint right-aligns under the code cell */
+		width: fit-content;
+		max-width: 100%;
+		margin: 1.2rem auto 0;
+	}
+	.umap-track {
+		display: flex;
+		align-items: stretch;
+		max-width: 100%;
+		overflow-x: auto;
+		border: 2.5px solid var(--ink);
+		border-radius: var(--radius);
+		background: var(--cream-lit);
+	}
+	.useg {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		gap: 0.4rem;
+		padding: 0.75rem 0.75rem 0.6rem;
+		border-right: 2px solid var(--line);
+		flex: 0 0 auto;
+	}
+	.useg:last-child {
+		border-right: 0;
+	}
+	.useg .ut {
+		font-size: 1.02rem;
+		color: var(--ink-2);
+		white-space: nowrap;
+	}
+	.useg .ul {
+		font-size: 0.6rem;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		color: var(--muted);
+		white-space: nowrap;
+	}
+	.useg.is-code {
+		background: #fdf2ee;
+	}
+	.useg.is-code .ut {
+		color: var(--red);
+		font-weight: 800;
+	}
+	.useg.is-code .ul {
+		color: var(--red-deep);
+		font-weight: 700;
+	}
+	.umap-hint {
+		font-size: 0.82rem;
+		font-weight: 700;
+		color: var(--red-deep);
+		text-align: right;
+		margin: 0.5rem 0.2rem 0 0;
+	}
+	.explain {
+		font-size: 0.98rem;
+		line-height: 1.62;
+		color: var(--ink-2);
+		margin: 0.9rem 0 0;
 	}
 	.mono {
 		font-family: var(--fm);
