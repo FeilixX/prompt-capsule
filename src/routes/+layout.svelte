@@ -184,11 +184,14 @@
 			<span class="sep">text/plain · n78.xyz</span>
 		</div>
 		<p class="disclaimer">{t('disclaimer')}</p>
-		<p class="icp">
-			<a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer"
-				>备案号</a
-			>
-		</p>
+		<!-- 备案号仅在运行时由 PUBLIC_ICP_FILING 注入(线上必须显示,合规);源码不含,不上公开仓 -->
+		{#if env.PUBLIC_ICP_FILING}
+			<p class="icp">
+				<a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer"
+					>{env.PUBLIC_ICP_FILING}</a
+				>
+			</p>
+		{/if}
 	</footer>
 </div>
 
