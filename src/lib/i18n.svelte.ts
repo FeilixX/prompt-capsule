@@ -143,7 +143,7 @@ const ZH: Dict = {
 	e404_cta: '回首页',
 
 	// skill page (/skill)
-	nav_skill: 'SKILL',
+	nav_skill: '怎么用',
 	sk_title: '接入 & 使用 · 提示词卡带',
 	sk_meta: '提示词卡带 Skill + 远程 MCP 的安装与使用：把提示词封成一次性 URL，任何 agent 能直接 fetch。',
 	sk_eyebrow: 'USING · 接入指南',
@@ -167,8 +167,10 @@ const ZH: Dict = {
 	sk_flow1_s: '你调好的 prompt / 长指令',
 	sk_flow2_b: '封成卡带',
 	sk_flow3_b: '一个链接',
-	sk_note1:
-		'链接两副面孔：/c/{slug} 纯文本给 agent fetch，/view/{slug} 给人看。到期或用删除口令销毁后即失效。',
+	sk_faces_cap: '一条链接，两副面孔',
+	sk_face_agent: '给 AI · fetch 后照着做',
+	sk_face_human: '给人看 · 复制、发社区（微信 / 飞书 / 小红书）',
+	sk_note1: '到期，或用删除口令销毁后，链接即失效 —— 短命封装，本来如此。',
 	sk_note2_tag: '反向 · 防降权',
 	sk_note2_h: '只发编码，不发链接',
 	sk_note2:
@@ -313,7 +315,7 @@ const EN: Dict = {
 	e404_cta: 'Back home',
 
 	// skill page (/skill)
-	nav_skill: 'SKILL',
+	nav_skill: 'Guide',
 	sk_title: 'Setup & usage · Prompt Tape',
 	sk_meta: 'Install and use Prompt Tape as a Skill + remote MCP: seal a prompt into a one-time URL any agent can fetch.',
 	sk_eyebrow: 'USING · GET STARTED',
@@ -337,8 +339,10 @@ const EN: Dict = {
 	sk_flow1_s: 'your tuned prompt / long instruction',
 	sk_flow2_b: 'Seal it',
 	sk_flow3_b: 'A link',
-	sk_note1:
-		'Two faces: /c/{slug} is plain text for agents to fetch, /view/{slug} is for humans. Gone once it expires or you delete it.',
+	sk_faces_cap: 'One link, two faces',
+	sk_face_agent: 'for AI · fetch and run',
+	sk_face_human: 'for people · read, share (WeChat / Feishu / RED)',
+	sk_note1: 'Gone once it expires, or when you kill it with the delete key.',
 	sk_note2_tag: 'Reverse · no downrank',
 	sk_note2_h: 'Share the code, not the link',
 	sk_note2:

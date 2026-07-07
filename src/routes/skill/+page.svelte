@@ -72,6 +72,47 @@
 		</figure>
 		<p class="explain">{t('sk_urlmap_p')}</p>
 
+		<p class="faces-cap">{t('sk_faces_cap')}</p>
+		<div class="faces">
+			<div class="face is-agent">
+				<img
+					class="face-ic"
+					src="/sprites/n78/robot-idle.png"
+					alt=""
+					aria-hidden="true"
+					width="52"
+				/>
+				<div class="face-t">
+					<code>/c/{'{code}'}</code>
+					<span class="face-l">{t('sk_face_agent')}</span>
+				</div>
+			</div>
+			<div class="face is-human">
+				<svg class="face-ic ppl" viewBox="0 0 64 60" aria-hidden="true">
+					<circle cx="43" cy="21" r="8" fill="var(--cream-lit)" stroke="var(--ink)" stroke-width="3" />
+					<path
+						d="M31 50 a13 13 0 0 1 25 0 Z"
+						fill="var(--cream-lit)"
+						stroke="var(--ink)"
+						stroke-width="3"
+						stroke-linejoin="round"
+					/>
+					<circle cx="24" cy="25" r="10" fill="var(--yellow)" stroke="var(--ink)" stroke-width="3.5" />
+					<path
+						d="M7 55 a17 17 0 0 1 34 0 Z"
+						fill="var(--yellow)"
+						stroke="var(--ink)"
+						stroke-width="3.5"
+						stroke-linejoin="round"
+					/>
+				</svg>
+				<div class="face-t">
+					<code>/view/{'{code}'}</code>
+					<span class="face-l">{t('sk_face_human')}</span>
+				</div>
+			</div>
+		</div>
+
 		<p class="note">{t('sk_note1')}</p>
 	</section>
 
@@ -338,6 +379,64 @@
 		line-height: 1.62;
 		color: var(--ink-2);
 		margin: 0.9rem 0 0;
+	}
+
+	/* two faces — /c/ → the robot (agent), /view/ → people (community). */
+	.faces-cap {
+		font-size: 0.72rem;
+		letter-spacing: 0.1em;
+		text-transform: uppercase;
+		color: var(--muted);
+		margin: 1.4rem 0 0.6rem;
+	}
+	.faces {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: 0.8rem;
+	}
+	.face {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+		padding: 0.8rem 0.9rem;
+		border: 2.5px solid var(--ink);
+		border-radius: var(--radius);
+		background: var(--cream-lit);
+	}
+	.face.is-agent {
+		box-shadow: 4px 4px 0 var(--teal);
+	}
+	.face.is-human {
+		box-shadow: 4px 4px 0 var(--yellow-deep);
+	}
+	.face-ic {
+		flex: none;
+		width: 52px;
+		height: auto;
+	}
+	svg.face-ic {
+		width: 48px;
+		height: 45px;
+	}
+	.face-t {
+		display: flex;
+		flex-direction: column;
+		align-items: flex-start;
+		gap: 0.3rem;
+		min-width: 0;
+	}
+	.face-t code {
+		font-size: 0.8rem;
+	}
+	.face-l {
+		font-size: 0.82rem;
+		line-height: 1.35;
+		color: var(--ink-2);
+	}
+	@media (max-width: 520px) {
+		.faces {
+			grid-template-columns: 1fr;
+		}
 	}
 	.mono {
 		font-family: var(--fm);
