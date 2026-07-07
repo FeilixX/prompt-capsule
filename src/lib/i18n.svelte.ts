@@ -162,6 +162,8 @@ const ZH: Dict = {
 	sk_flow3_b: '一个链接',
 	sk_note1:
 		'链接两副面孔：/c/{slug} 纯文本给 agent fetch，/view/{slug} 给人看。到期或用删除口令销毁后即失效。',
+	sk_note2_tag: '反向 · 防降权',
+	sk_note2_h: '只发编码，不发链接',
 	sk_note2:
 		'反向也行：URL 后缀那串就是卡带「编码」。把编码单独发出去，跟装了 skill 的 AI 说「读取卡带 XXXX」，它自己 fetch 回正文照做。有些平台（比如小红书）发链接会降权，只发编码不会 —— 用 create 返回的 code_share_text。',
 	sk_k2: '三种接入方式',
@@ -323,6 +325,8 @@ const EN: Dict = {
 	sk_flow3_b: 'A link',
 	sk_note1:
 		'Two faces: /c/{slug} is plain text for agents to fetch, /view/{slug} is for humans. Gone once it expires or you delete it.',
+	sk_note2_tag: 'Reverse · no downrank',
+	sk_note2_h: 'Share the code, not the link',
 	sk_note2:
 		'Reverse works too: the URL suffix is the tape’s "code". Share the bare code, tell an AI (with the skill) "read tape XXXX", and it fetches the text and runs it. Sharing bare codes dodges the link-downranking some platforms do — use the code_share_text create returns.',
 	sk_k2: 'Three ways in',

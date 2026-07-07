@@ -123,7 +123,11 @@
 				</tbody>
 			</table>
 		</div>
-		<p class="note">{t('sk_note2')}</p>
+		<div class="hl-callout">
+			<span class="px-chip is-red">{t('sk_note2_tag')}</span>
+			<p class="hl-h">{t('sk_note2_h')}</p>
+			<p class="hl-b">{t('sk_note2')}</p>
+		</div>
 	</section>
 
 	<section>
@@ -228,6 +232,34 @@
 		font-size: 0.9rem;
 		color: var(--muted);
 		margin: 0.9rem 0 0;
+	}
+
+	/* reverse-flow highlight — the code-sharing / 防降权 hook. Pops off the flat
+	   panels via a hard red offset shadow (on-theme for 小红书) + faint red tint. */
+	.hl-callout {
+		margin: 1.2rem 0 0;
+		padding: 1.05rem 1.2rem 1.15rem;
+		border: 3px solid var(--ink);
+		border-radius: var(--radius);
+		background: #fdf2ee;
+		box-shadow: 5px 5px 0 var(--red);
+	}
+	.hl-callout .px-chip {
+		margin-bottom: 0.6rem;
+	}
+	.hl-h {
+		font-size: clamp(1.08rem, 3.2vw, 1.32rem);
+		font-weight: 800;
+		line-height: 1.24;
+		color: var(--ink);
+		margin: 0 0 0.45rem;
+		text-wrap: balance;
+	}
+	.hl-b {
+		font-size: 0.95rem;
+		line-height: 1.6;
+		color: var(--ink-2);
+		margin: 0;
 	}
 	.mono {
 		font-family: var(--fm);
