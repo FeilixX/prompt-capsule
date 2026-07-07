@@ -7,7 +7,8 @@ import {
 	getActiveCapsule,
 	getCapsuleRaw,
 	deleteCapsule,
-	bumpViewCount
+	bumpViewCount,
+	isBlocked
 } from './capsules';
 import { buildTextBody } from './body';
 
@@ -99,6 +100,11 @@ export interface TextResult {
 export function renderCapsuleText(db: Database, slug: string, nowMs: number): TextResult {
 	const raw = getCapsuleRaw(db, slug);
 	if (!raw) {
+		return { status: 404, contentType: PLAIN, body: '404 未找到 / Not found.' };
+	}
+	// A moderation-blocked capsule reads as 404 (never-existed), not 410 (gone) —
+	// don't signal to a bad actor that the slug was live and got taken down.
+	if (isBlocked(raw)) {
 		return { status: 404, contentType: PLAIN, body: '404 未找到 / Not found.' };
 	}
 	const active = getActiveCapsule(db, slug, nowMs);

@@ -74,6 +74,29 @@ test('renderCapsuleText increments view_count on a hit', () => {
 	expect(getActiveCapsule(db, res.slug, T0)!.view_count).toBe(2);
 });
 
+test('renderCapsuleText: a pending capsule is publicly readable (publish-then-review)', () => {
+	const db = freshDb();
+	const res = make(db, 'pending payload'); // fresh create = pending
+	expect(renderCapsuleText(db, res.slug, T0).status).toBe(200);
+});
+
+test('renderCapsuleText: a blocked capsule reads as 404 (never-existed), not 410', () => {
+	const db = freshDb();
+	const res = make(db, 'forbidden payload');
+	db.query("UPDATE capsules SET moderation_status = 'blocked' WHERE slug = ?").run(res.slug);
+	const out = renderCapsuleText(db, res.slug, T0);
+	expect(out.status).toBe(404);
+	expect(out.body).not.toContain('forbidden payload'); // content must not leak
+});
+
+test('renderCapsuleText: blocked takes precedence over expiry (still 404, not 410)', () => {
+	const db = freshDb();
+	const res = make(db, 'x', { ttl_seconds: 3600 });
+	db.query("UPDATE capsules SET moderation_status = 'blocked' WHERE slug = ?").run(res.slug);
+	// Past expiry a normal capsule is 410; a blocked one stays 404 — the blocked check runs first.
+	expect(renderCapsuleText(db, res.slug, T0 + 3601_000).status).toBe(404);
+});
+
 test('deleteCapsuleByToken: right token 200, wrong token 403', () => {
 	const db = freshDb();
 	const res = make(db, 'x');

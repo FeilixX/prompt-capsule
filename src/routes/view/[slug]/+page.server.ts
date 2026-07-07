@@ -1,12 +1,13 @@
 import type { PageServerLoad } from './$types';
 import { error } from '@sveltejs/kit';
 import { getDb, config } from '$lib/server/db';
-import { getCapsuleRaw, getActiveCapsule } from '$lib/server/capsules';
+import { getCapsuleRaw, getActiveCapsule, isBlocked } from '$lib/server/capsules';
 
 export const load: PageServerLoad = ({ params }) => {
 	const db = getDb();
 	const raw = getCapsuleRaw(db, params.slug);
-	if (!raw) throw error(404, 'capsule not found');
+	// Blocked capsules 404 like a missing slug (never expose that it was live then removed).
+	if (!raw || isBlocked(raw)) throw error(404, 'capsule not found');
 
 	const active = getActiveCapsule(db, params.slug, Date.now());
 	const url = `${config.publicBaseUrl}${config.routePrefix}/${raw.slug}`;

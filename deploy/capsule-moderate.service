@@ -1,0 +1,32 @@
+# systemd unit for the publish-then-review moderation worker.
+# Reference TEMPLATE — the __PLACEHOLDERS__ below MUST be edited before install; this file does
+# not run as-is. Copy to /etc/systemd/system/ on the box that holds the SQLite DB (the worker
+# opens data/capsules.db directly, so it MUST run on the same host as the web app).
+
+[Unit]
+Description=Prompt Capsule moderation worker (publish-then-review via DeepSeek)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# __DEPLOY_DIR__ = the rsync target that contains build/ (e.g. /opt/prompt-capsule), the SAME dir
+# the web app runs from, so build/moderate.js and data/capsules.db resolve to one deploy + one DB.
+WorkingDirectory=__DEPLOY_DIR__
+# __RUN_USER__ = the account that owns data/capsules.db (match the web service's User=).
+User=__RUN_USER__
+# .env carries DEEPSEEK_API_KEY, MODERATION_ENABLED=true, DB_PATH, and (on aliyun/CN) an
+# empty DEEPSEEK_PROXY for a direct connect. Never commit this file (secret-zero).
+EnvironmentFile=__DEPLOY_DIR__/.env
+# __BUN_PATH__ = absolute path to a bun binary the __RUN_USER__ can execute. Do NOT point into
+# /root (a non-root User= can't traverse it → 203/EXEC); use a shared path like /usr/local/bin/bun
+# and verify it's a real ELF: `file /usr/local/bin/bun`. Runs the bundled worker (bun run build:worker).
+ExecStart=__BUN_PATH__ build/moderate.js
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=capsule-moderate
+
+[Install]
+WantedBy=multi-user.target

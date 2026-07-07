@@ -5,27 +5,57 @@ import { generateSlug } from '../utils/slug';
 /**
  * Canonical schema for the capsules table. `db/schema.sql` mirrors this for ops reference;
  * this constant is the single source of truth (applied by initSchema).
- * v1 deliberately omits pool/moderation columns — added only when the discovery pool ships (ROOT-v1 step 4).
+ *
+ * Moderation columns (post-v1): a capsule is created `pending` and stays publicly
+ * readable (先发后审 / publish-then-review). An out-of-band worker classifies it
+ * via DeepSeek and flips it to `approved` or `blocked`; a `blocked` capsule reads
+ * as 404 to the outside (see isBlocked + renderCapsuleText). Columns are added to
+ * live DBs by migrateSchema (idempotent ALTER), so this constant and an old table
+ * converge to the same shape.
  */
 export const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS capsules (
-  id                TEXT PRIMARY KEY,
-  slug              TEXT UNIQUE NOT NULL,
-  title             TEXT,
-  content           TEXT NOT NULL,
-  content_sha256    TEXT NOT NULL,
-  content_bytes     INTEGER NOT NULL,
-  created_at        TEXT NOT NULL,
-  expires_at        TEXT NOT NULL,
-  deleted_at        TEXT,
-  delete_token_hash TEXT NOT NULL,
-  source            TEXT NOT NULL,
-  has_callback      INTEGER NOT NULL DEFAULT 0,
-  view_count        INTEGER NOT NULL DEFAULT 0,
-  copy_count        INTEGER NOT NULL DEFAULT 0
+  id                  TEXT PRIMARY KEY,
+  slug                TEXT UNIQUE NOT NULL,
+  title               TEXT,
+  content             TEXT NOT NULL,
+  content_sha256      TEXT NOT NULL,
+  content_bytes       INTEGER NOT NULL,
+  created_at          TEXT NOT NULL,
+  expires_at          TEXT NOT NULL,
+  deleted_at          TEXT,
+  delete_token_hash   TEXT NOT NULL,
+  source              TEXT NOT NULL,
+  has_callback        INTEGER NOT NULL DEFAULT 0,
+  view_count          INTEGER NOT NULL DEFAULT 0,
+  copy_count          INTEGER NOT NULL DEFAULT 0,
+  moderation_status   TEXT NOT NULL DEFAULT 'pending',
+  moderation_reason   TEXT,
+  moderation_model    TEXT,
+  moderated_at        TEXT,
+  moderation_attempts INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS idx_capsules_expires ON capsules(expires_at);
 `;
+// NB: the idx_capsules_moderation index is created in migrateSchema, NOT here. On an existing
+// v1 DB, CREATE TABLE IF NOT EXISTS no-ops (no moderation_status column yet), so an index on that
+// column in this same batch would throw "no such column" before migrateSchema can ALTER it in.
+
+/** Moderation lifecycle states. `pending` is publicly readable (publish-then-review). */
+export type ModerationStatus = 'pending' | 'approved' | 'blocked';
+
+/**
+ * Columns added after the v1 table shipped. migrateSchema ALTERs any that are
+ * missing, so an old on-disk DB (created before moderation) converges to SCHEMA_SQL.
+ * SQLite allows ADD COLUMN with a constant NOT NULL DEFAULT, which is what we rely on.
+ */
+const MODERATION_COLUMNS: ReadonlyArray<readonly [string, string]> = [
+	['moderation_status', "TEXT NOT NULL DEFAULT 'pending'"],
+	['moderation_reason', 'TEXT'],
+	['moderation_model', 'TEXT'],
+	['moderated_at', 'TEXT'],
+	['moderation_attempts', 'INTEGER NOT NULL DEFAULT 0']
+];
 
 export interface Capsule {
 	id: string;
@@ -42,6 +72,11 @@ export interface Capsule {
 	has_callback: number;
 	view_count: number;
 	copy_count: number;
+	moderation_status: ModerationStatus;
+	moderation_reason: string | null;
+	moderation_model: string | null;
+	moderated_at: string | null;
+	moderation_attempts: number;
 }
 
 export interface CreateInput {
@@ -63,6 +98,44 @@ const MAX_SLUG_ATTEMPTS = 6;
 
 export function initSchema(db: Database): void {
 	db.run(SCHEMA_SQL);
+	migrateSchema(db);
+}
+
+/**
+ * Bring an existing table up to SCHEMA_SQL by ALTER-ing in any missing moderation
+ * columns. Idempotent: on a fresh DB (columns already present via SCHEMA_SQL) it is a
+ * no-op; on an old DB it backfills, and every pre-existing row defaults to `pending`.
+ */
+export function migrateSchema(db: Database): void {
+	const existing = new Set(
+		(db.query('PRAGMA table_info(capsules)').all() as { name: string }[]).map((c) => c.name)
+	);
+	for (const [name, def] of MODERATION_COLUMNS) {
+		if (existing.has(name)) continue;
+		try {
+			db.run(`ALTER TABLE capsules ADD COLUMN ${name} ${def}`);
+		} catch (e) {
+			// Concurrent first-open (web + worker): the other process may ADD this column between
+			// our PRAGMA read and this ALTER. A duplicate-column error is then benign; re-throw
+			// anything else. Column name/def come only from the hardcoded MODERATION_COLUMNS
+			// constant, so there is no injection surface in the interpolation.
+			if (!isDuplicateColumn(e)) throw e;
+		}
+	}
+	db.run('CREATE INDEX IF NOT EXISTS idx_capsules_moderation ON capsules(moderation_status)');
+}
+
+function isDuplicateColumn(e: unknown): boolean {
+	const msg = e instanceof Error ? e.message : String(e);
+	return msg.toLowerCase().includes('duplicate column');
+}
+
+/**
+ * A blocked capsule must read as if it never existed (404), not 410 — 410 leaks that
+ * the slug once held content. `pending` and `approved` are both publicly readable.
+ */
+export function isBlocked(row: Capsule): boolean {
+	return row.moderation_status === 'blocked';
 }
 
 function sha256(input: string): string {
@@ -90,7 +163,15 @@ export function createCapsule(db: Database, input: CreateInput): CreateResult {
 		source: input.source,
 		has_callback: input.hasCallback ? 1 : 0,
 		view_count: 0,
-		copy_count: 0
+		copy_count: 0,
+		// New capsules enter moderation as `pending`: publicly readable, awaiting the
+		// out-of-band DeepSeek worker. The INSERT below relies on the column DEFAULTs;
+		// these mirror them so the returned object matches the persisted row.
+		moderation_status: 'pending',
+		moderation_reason: null,
+		moderation_model: null,
+		moderated_at: null,
+		moderation_attempts: 0
 	};
 
 	const insert = db.query(
@@ -163,4 +244,74 @@ export function deleteCapsule(db: Database, slug: string, token: string, nowMs: 
 
 export function bumpViewCount(db: Database, slug: string): void {
 	db.query('UPDATE capsules SET view_count = view_count + 1 WHERE slug = ?').run(slug);
+}
+
+// ---- moderation (publish-then-review worker) ----------------------------
+
+/**
+ * Pending capsules still under the retry budget, oldest first (worker batch input).
+ * Excludes soft-deleted and expired rows: a capsule the creator already deleted must never
+ * have its content shipped to a third party (DeepSeek), and expired rows waste API calls.
+ */
+export function selectPendingForModeration(
+	db: Database,
+	limit: number,
+	maxAttempts: number,
+	nowMs: number
+): Capsule[] {
+	return db
+		.query(
+			`SELECT * FROM capsules
+       WHERE moderation_status = 'pending' AND moderation_attempts < ?
+         AND deleted_at IS NULL AND expires_at > ?
+       ORDER BY created_at ASC
+       LIMIT ?`
+		)
+		.all(maxAttempts, new Date(nowMs).toISOString(), limit) as Capsule[];
+}
+
+/**
+ * Record a terminal verdict (approved | blocked) for one capsule. Guarded on `pending` so a
+ * stale in-flight verdict or a second worker can never overwrite an already-decided row
+ * (e.g. flip a `blocked` capsule back to `approved`). Returns true only if this call decided it.
+ */
+export function applyModeration(
+	db: Database,
+	id: string,
+	status: 'approved' | 'blocked',
+	reason: string | null,
+	model: string,
+	nowMs: number
+): boolean {
+	const res = db
+		.query(
+			`UPDATE capsules
+         SET moderation_status = ?, moderation_reason = ?, moderation_model = ?, moderated_at = ?
+       WHERE id = ? AND moderation_status = 'pending'`
+		)
+		.run(status, reason, model, new Date(nowMs).toISOString(), id);
+	return res.changes > 0;
+}
+
+/** Count one failed round against a capsule; the attempt budget drives fail-open. */
+export function bumpModerationAttempt(db: Database, id: string): void {
+	db.query('UPDATE capsules SET moderation_attempts = moderation_attempts + 1 WHERE id = ?').run(id);
+}
+
+/**
+ * Fail-open net: any capsule still pending after maxAttempts failed rounds is auto-approved,
+ * so a persistently-unreachable DeepSeek never traps content in pending. Returns the count.
+ */
+export function autoApproveExhausted(db: Database, maxAttempts: number, nowMs: number): number {
+	const nowIso = new Date(nowMs).toISOString();
+	const res = db
+		.query(
+			`UPDATE capsules
+         SET moderation_status = 'approved',
+             moderation_reason = ?, moderation_model = 'fallback', moderated_at = ?
+       WHERE moderation_status = 'pending' AND moderation_attempts >= ?
+         AND deleted_at IS NULL AND expires_at > ?`
+		)
+		.run(`auto-approved after ${maxAttempts} failed attempts`, nowIso, maxAttempts, nowIso);
+	return res.changes;
 }

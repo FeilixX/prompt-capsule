@@ -38,3 +38,63 @@ test('clampTtl caps requested at maxTtlSeconds and keeps valid values', () => {
 	expect(clampTtl(c, 3600)).toBe(3600);
 	expect(clampTtl(c, 999999999)).toBe(604800);
 });
+
+test('loadConfig: moderation defaults (disabled, no key, current model)', () => {
+	const m = loadConfig({}).moderation;
+	expect(m.enabled).toBe(false);
+	expect(m.deepseekApiKey).toBe('');
+	expect(m.deepseekBaseUrl).toBe('https://api.deepseek.com');
+	expect(m.deepseekModel).toBe('deepseek-v4-flash');
+	expect(m.proxyUrl).toBe('');
+	expect(m.batchSize).toBe(20);
+	expect(m.intervalSec).toBe(60);
+	expect(m.maxAttempts).toBe(3);
+	expect(m.timeoutSec).toBe(30);
+});
+
+test('loadConfig: moderation overrides parse from env', () => {
+	const m = loadConfig({
+		MODERATION_ENABLED: 'true',
+		DEEPSEEK_API_KEY: 'sk-x',
+		DEEPSEEK_MODEL: 'deepseek-v4-pro',
+		DEEPSEEK_PROXY: 'http://127.0.0.1:12334',
+		MODERATION_BATCH_SIZE: '5',
+		MODERATION_INTERVAL_SEC: '30',
+		MODERATION_MAX_ATTEMPTS: '2',
+		MODERATION_TIMEOUT_SEC: '45'
+	}).moderation;
+	expect(m.enabled).toBe(true);
+	expect(m.deepseekApiKey).toBe('sk-x');
+	expect(m.deepseekModel).toBe('deepseek-v4-pro');
+	expect(m.proxyUrl).toBe('http://127.0.0.1:12334');
+	expect(m.batchSize).toBe(5);
+	expect(m.intervalSec).toBe(30);
+	expect(m.maxAttempts).toBe(2);
+	expect(m.timeoutSec).toBe(45);
+});
+
+test('loadConfig: MODERATION_ENABLED accepts true/1/yes, else false', () => {
+	expect(loadConfig({ MODERATION_ENABLED: '1' }).moderation.enabled).toBe(true);
+	expect(loadConfig({ MODERATION_ENABLED: 'yes' }).moderation.enabled).toBe(true);
+	expect(loadConfig({ MODERATION_ENABLED: 'TRUE' }).moderation.enabled).toBe(true);
+	expect(loadConfig({ MODERATION_ENABLED: 'false' }).moderation.enabled).toBe(false);
+	expect(loadConfig({ MODERATION_ENABLED: 'nonsense' }).moderation.enabled).toBe(false);
+});
+
+test('loadConfig: moderation numerics reject out-of-range (no hot-loop / no zero-batch footgun)', () => {
+	// 0 interval would hot-loop a paid API; -1 batch / 0 attempts are nonsense → fall back to defaults.
+	const bad = loadConfig({
+		MODERATION_INTERVAL_SEC: '0',
+		MODERATION_BATCH_SIZE: '-1',
+		MODERATION_MAX_ATTEMPTS: '0',
+		MODERATION_TIMEOUT_SEC: '-5'
+	}).moderation;
+	expect(bad.intervalSec).toBe(60);
+	expect(bad.batchSize).toBe(20);
+	expect(bad.maxAttempts).toBe(3);
+	expect(bad.timeoutSec).toBe(30);
+	// over the upper clamp also falls back
+	expect(loadConfig({ MODERATION_BATCH_SIZE: '9999' }).moderation.batchSize).toBe(20);
+	// non-integer floors into range
+	expect(loadConfig({ MODERATION_BATCH_SIZE: '7.9' }).moderation.batchSize).toBe(7);
+});

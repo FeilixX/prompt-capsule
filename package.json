@@ -5,7 +5,8 @@
 	"type": "module",
 	"scripts": {
 		"dev": "bun --bun vite dev",
-		"build": "bun --bun vite build",
+		"build": "bun --bun vite build && bun run build:worker",
+		"build:worker": "bun build scripts/moderate.ts --target bun --outfile build/moderate.js",
 		"preview": "bun --bun vite preview",
 		"start": "bun build/index.js",
 		"prepare": "svelte-kit sync || echo ''",

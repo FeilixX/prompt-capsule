@@ -13,9 +13,18 @@ let db: Database | null = null;
 export function getDb(): Database {
 	if (!db) {
 		mkdirSync(dirname(config.dbPath), { recursive: true });
-		db = new Database(config.dbPath, { create: true });
-		db.run('PRAGMA journal_mode = WAL');
-		initSchema(db);
+		const next = new Database(config.dbPath, { create: true });
+		// busy_timeout FIRST, before any other statement. The moderation worker is a SECOND
+		// writer process against this file; WAL allows one writer at a time and bun:sqlite
+		// defaults busy_timeout to 0 (a contended write throws `database is locked` immediately).
+		// Setting it first means even the journal_mode/migration statements below wait/retry
+		// under contention instead of erroring.
+		next.run('PRAGMA busy_timeout = 5000');
+		next.run('PRAGMA journal_mode = WAL');
+		initSchema(next);
+		// Publish only after full init succeeds. If anything above throws, `db` stays null and the
+		// next getDb() retries a complete init — never a half-initialized (unmigrated) connection.
+		db = next;
 	}
 	return db;
 }
