@@ -83,8 +83,10 @@ export function mcpCreate(
 	const payload = {
 		view_url: r.view_url,
 		raw_url: r.url,
+		code: r.slug, // 卡带编码 = slug;下游可只传编码,用 read_prompt_tape 取回
 		delete_token: r.delete_token,
 		expires_at: r.expires_at,
+		code_share_text: r.code_share_text, // URL-free 分享串(小红书防降权)
 		agent_text: r.agent_text // C2: the "fetch this URL and execute it" line
 	};
 	logTool('create', deps.clientIp, true);
@@ -97,6 +99,7 @@ export function mcpCreate(
 export function slugFromTarget(target: string): string {
 	let t = target.trim();
 	if (/^https?:\/\//i.test(t)) t = new URL(t).pathname;
+	t = t.replace(/[?#].*$/, ''); // drop query/hash (covers relative /c/x?a=1, not just full URLs)
 	t = t.replace(/\/+$/, ''); // strip trailing slashes
 	return t.slice(t.lastIndexOf('/') + 1); // last path segment (whole string if no slash)
 }

@@ -26,6 +26,10 @@ test('mcpCreate returns urls + delete_token + agent_text', () => {
 	expect(out.delete_token).toBeTruthy();
 	expect(out.expires_at).toBeTruthy();
 	expect(out.agent_text).toContain('http'); // C2: agent_text carries the fetchable URL
+	// code = slug, resolvable via read_prompt_tape; code_share_text is URL-free (RED anti-downrank)
+	expect(out.raw_url).toContain(out.code);
+	expect(out.code_share_text).toContain(out.code);
+	expect(out.code_share_text).not.toMatch(/https?:\/\//); // deterministic: base62 slug can't produce '://'
 	// text mirror parses to the same payload
 	expect(JSON.parse(r.content[0].text).raw_url).toBe(out.raw_url);
 });
@@ -58,6 +62,9 @@ test('slugFromTarget handles slug and urls', () => {
 	expect(slugFromTarget('https://n78.xyz/c/X2xIRFcn')).toBe('X2xIRFcn');
 	expect(slugFromTarget('https://n78.xyz/view/X2xIRFcn?x=1')).toBe('X2xIRFcn');
 	expect(slugFromTarget('/c/abc/')).toBe('abc');
+	// relative path carrying a query/hash — stripped even without a scheme
+	expect(slugFromTarget('/c/abc12345?utm=xhs')).toBe('abc12345');
+	expect(slugFromTarget('/view/abc12345#frag')).toBe('abc12345');
 });
 
 // ---- read ----

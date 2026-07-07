@@ -30,7 +30,7 @@ function buildServer(clientIp: string): McpServer {
 		'create_prompt_tape',
 		{
 			description:
-				'把一段提示词/文本封成一次性卡带 URL。content ≤16KB;ttl_seconds ≤604800(7天,缺省7天)。返回 view_url(人看)、raw_url(agent 直接 fetch)、delete_token、expires_at、agent_text。',
+				'把一段提示词/文本封成一次性卡带 URL。content ≤16KB;ttl_seconds ≤604800(7天,缺省7天)。返回 view_url(人看)、raw_url(agent 直接 fetch)、code(卡带编码=slug,下游可只传编码用 read_prompt_tape 取回)、code_share_text(只含编码、无 URL 的分享串,适合小红书等发链接会被降权的平台)、delete_token、expires_at、agent_text。',
 			inputSchema: z.object({
 				content: z.string().describe('要封存的提示词/文本正文'),
 				title: z.string().max(200).optional(),

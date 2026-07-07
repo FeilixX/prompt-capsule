@@ -34,6 +34,19 @@ test('createCapsuleFromInput returns share metadata built from config', () => {
 	expect(res.expires_at).toBe(new Date(T0 + 604800 * 1000).toISOString());
 });
 
+test('code_share_text carries the code and is URL-free (RED anti-downrank)', () => {
+	const db = freshDb();
+	const res = make(db, 'hello');
+	// Must contain the bare code so a reader can resolve it via read_prompt_tape / GET /c/{code}.
+	expect(res.code_share_text).toContain(res.slug);
+	// The whole point: NO url in this string — a full link is what gets downranked on 小红书.
+	// Match a scheme (https://) deterministically: a base62 slug can contain the substring
+	// "http" (~3e-7) but never "://" (':' and '/' aren't base62), so toMatch avoids a flake.
+	expect(res.code_share_text).not.toMatch(/https?:\/\//);
+	expect(res.code_share_text).not.toContain('n78.xyz'); // '.' not in base62 → deterministic
+	expect(res.code_share_text).not.toContain('/c/'); // '/' not in base62 → deterministic
+});
+
 test('createCapsuleFromInput rejects empty content', () => {
 	const db = freshDb();
 	const r = createCapsuleFromInput(db, cfg, { content: '   ' }, T0);

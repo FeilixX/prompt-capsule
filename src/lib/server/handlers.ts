@@ -32,6 +32,9 @@ export interface CreateResponse {
 	expires_at: string;
 	delete_token: string;
 	share_text: string;
+	// URL-free 分享串:只含编码。小红书等平台发完整链接易被降权,发裸编码则否。
+	// 读者用「读取提示词卡带 {slug}」让装了 prompt-tape skill/MCP 的 AI resolve 并执行。
+	code_share_text: string;
 	agent_text: string;
 }
 
@@ -84,6 +87,7 @@ export function createCapsuleFromInput(
 			expires_at: capsule.expires_at,
 			delete_token: deleteToken,
 			share_text: `提示词卡带: ${display}`,
+			code_share_text: `提示词卡带编码：${capsule.slug}（让你的 AI 说「读取提示词卡带 ${capsule.slug}」即可取回并执行）`,
 			agent_text: `打开这个链接，按里面的内容执行：${url}`
 		}
 	};
