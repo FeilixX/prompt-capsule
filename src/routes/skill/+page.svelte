@@ -27,7 +27,7 @@
 		{
 			name: 'create_prompt_tape',
 			args: 'content · title? · ttl_seconds?',
-			ret: 'view_url · raw_url · delete_token · expires_at · agent_text'
+			ret: 'view_url · raw_url · code · code_share_text · delete_token · expires_at · agent_text'
 		},
 		{ name: 'read_prompt_tape', args: t('sk_read_args'), ret: t('sk_read_ret') },
 		{ name: 'delete_prompt_tape', args: 'slug · delete_token', ret: 'deleted' }
@@ -123,6 +123,7 @@
 				</tbody>
 			</table>
 		</div>
+		<p class="note">{t('sk_note2')}</p>
 	</section>
 
 	<section>
@@ -130,10 +131,12 @@
 		<h2>{t('sk_h2_4')}</h2>
 		<pre class="wide"><code><span class="c">{t('sk_ex_c1')}</span>
 {'{'}
-  <span class="k">"view_url"</span>:    <span class="s">"https://n78.xyz/view/okIdDdhU"</span>,  <span class="c">{t('sk_ex_human')}</span>
-  <span class="k">"raw_url"</span>:     <span class="s">"https://n78.xyz/c/okIdDdhU"</span>,     <span class="c">{t('sk_ex_agent')}</span>
-  <span class="k">"delete_token"</span>: <span class="s">"…"</span>,                            <span class="c">{t('sk_ex_private')}</span>
-  <span class="k">"agent_text"</span>:  <span class="s">"… https://n78.xyz/c/okIdDdhU"</span>
+  <span class="k">"view_url"</span>:        <span class="s">"https://n78.xyz/view/okIdDdhU"</span>,  <span class="c">{t('sk_ex_human')}</span>
+  <span class="k">"raw_url"</span>:         <span class="s">"https://n78.xyz/c/okIdDdhU"</span>,     <span class="c">{t('sk_ex_agent')}</span>
+  <span class="k">"code"</span>:            <span class="s">"okIdDdhU"</span>,                       <span class="c">{t('sk_ex_code')}</span>
+  <span class="k">"code_share_text"</span>: <span class="s">"…读取提示词卡带 okIdDdhU…"</span>,        <span class="c">{t('sk_ex_share')}</span>
+  <span class="k">"delete_token"</span>:    <span class="s">"…"</span>,                            <span class="c">{t('sk_ex_private')}</span>
+  <span class="k">"agent_text"</span>:      <span class="s">"… https://n78.xyz/c/okIdDdhU"</span>
 {'}'}
 
 <span class="c">{t('sk_ex_c2')}</span>
