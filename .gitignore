@@ -46,5 +46,7 @@ renders/
 # internal planning docs (specs/plans/reviews) — local only, not public
 docs/superpowers/
 
-# local RED-upload bundle — not tracked
+# local RED-upload bundle — not tracked (contains ICP filing number; must never hit the public repo)
 skills/xhs/
+skills/*.zip
+skills/xhs.zip
