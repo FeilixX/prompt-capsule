@@ -73,13 +73,26 @@
 	// carry data-clarity-mask), so nothing a user types or views is ever uploaded.
 	// Public, non-secret project id; override via PUBLIC_CLARITY_ID, empty to disable.
 	const CLARITY_ID = env.PUBLIC_CLARITY_ID ?? 'xhnibg6pub';
+	// Only load Clarity on the canonical production host — an allowlist, not a denylist. A
+	// hostname denylist can never enumerate every non-prod host (LAN IP, staging, tunnel), so a
+	// preview build served anywhere but here simply never touches the prod dashboard.
+	const PROD_HOST = (() => {
+		try {
+			return new URL(env.PUBLIC_BASE_URL || SITE).hostname;
+		} catch {
+			return new URL(SITE).hostname;
+		}
+	})();
 
 	$effect(() => {
 		initLocale();
 	});
 
 	onMount(() => {
-		if (dev || !CLARITY_ID) return; // never send localhost sessions to the dashboard
+		// Load Clarity ONLY on the production host (allowlist). `dev` alone missed `vite preview`
+		// (a prod build served on localhost:4173, dev===false) which was polluting the dashboard;
+		// a hostname allowlist also covers LAN-IP / staging / tunnel previews a denylist would miss.
+		if (dev || !CLARITY_ID || location.hostname !== PROD_HOST) return;
 		type ClarityApi = { (...args: unknown[]): void; q?: unknown[] };
 		const w = window as Window & { clarity?: ClarityApi };
 		if (!w.clarity) {

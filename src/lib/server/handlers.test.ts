@@ -2,7 +2,12 @@ import { test, expect } from 'bun:test';
 import { Database } from 'bun:sqlite';
 import { initSchema, getActiveCapsule } from './capsules';
 import { loadConfig } from '../config';
-import { renderCapsuleText, createCapsuleFromInput, deleteCapsuleByToken } from './handlers';
+import {
+	renderCapsuleText,
+	createCapsuleFromInput,
+	deleteCapsuleByToken,
+	recordCopy
+} from './handlers';
 
 const T0 = 1_700_000_000_000;
 const cfg = loadConfig({}); // defaults: n78.xyz, /c, 16384 bytes, 7d
@@ -108,6 +113,33 @@ test('renderCapsuleText: blocked takes precedence over expiry (still 404, not 41
 	db.query("UPDATE capsules SET moderation_status = 'blocked' WHERE slug = ?").run(res.slug);
 	// Past expiry a normal capsule is 410; a blocked one stays 404 — the blocked check runs first.
 	expect(renderCapsuleText(db, res.slug, T0 + 3601_000).status).toBe(404);
+});
+
+test('recordCopy increments copy_count on a live capsule', () => {
+	const db = freshDb();
+	const res = make(db, 'x');
+	expect(recordCopy(db, res.slug, T0)).toBe(true);
+	expect(recordCopy(db, res.slug, T0)).toBe(true);
+	expect(getActiveCapsule(db, res.slug, T0)!.copy_count).toBe(2);
+});
+
+test('recordCopy is a no-op for missing / expired / blocked / deleted capsules', () => {
+	const db = freshDb();
+	// missing slug
+	expect(recordCopy(db, 'missing00', T0)).toBe(false);
+	// expired
+	const exp = make(db, 'x', { ttl_seconds: 3600 });
+	expect(recordCopy(db, exp.slug, T0 + 3601_000)).toBe(false);
+	// blocked reads as never-existed → not counted
+	const blk = make(db, 'x');
+	db.query("UPDATE capsules SET moderation_status = 'blocked' WHERE slug = ?").run(blk.slug);
+	expect(recordCopy(db, blk.slug, T0)).toBe(false);
+	// soft-deleted
+	const del = make(db, 'x');
+	deleteCapsuleByToken(db, del.slug, del.delete_token, T0);
+	expect(recordCopy(db, del.slug, T0)).toBe(false);
+	// none of the no-ops moved the counter
+	expect(getActiveCapsule(db, exp.slug, T0)!.copy_count).toBe(0);
 });
 
 test('deleteCapsuleByToken: right token 200, wrong token 403', () => {

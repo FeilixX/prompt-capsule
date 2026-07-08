@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { t } from '$lib/i18n.svelte';
+	import { clarityEvent, copyText } from '$lib/client';
 
 	interface CreateResponse {
 		slug: string;
@@ -76,6 +77,7 @@
 				return;
 			}
 			result = data as CreateResponse;
+			clarityEvent('tape_created'); // the key conversion — home visit → sealed tape
 		} catch {
 			errorMsg = t('m_err_generic');
 		} finally {
@@ -89,9 +91,15 @@
 	}
 
 	async function copy(text: string, which: string) {
-		await navigator.clipboard.writeText(text);
-		copied = which;
-		setTimeout(() => (copied = ''), 1400);
+		const ok = await copyText(text);
+		if (ok) {
+			copied = which;
+			setTimeout(() => (copied = ''), 1400);
+		}
+		// Clarity captures the creation funnel (tape_created → copy_*). copy_count (DB) is NOT
+		// bumped here: a creator copying their own just-issued link/agent_text isn't reader
+		// interest — copy_count counts /view reader copies only.
+		clarityEvent(ok ? 'copy_' + which : 'copy_fail');
 	}
 
 	async function doDelete() {
@@ -106,6 +114,7 @@
 			});
 			if (res.ok) {
 				deleted = true;
+				clarityEvent('tape_deleted');
 			} else {
 				const data = await res.json();
 				deleteErr = data.message ?? data.error ?? t('v_del_fail');

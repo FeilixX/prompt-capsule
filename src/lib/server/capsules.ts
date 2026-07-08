@@ -246,6 +246,22 @@ export function bumpViewCount(db: Database, slug: string): void {
 	db.query('UPDATE capsules SET view_count = view_count + 1 WHERE slug = ?').run(slug);
 }
 
+/**
+ * Atomically bump copy_count only if the capsule is currently live — not deleted, not expired,
+ * and not moderation-blocked. One conditional UPDATE, so the moderation worker (a SECOND process)
+ * or a concurrent delete can't flip the row between a liveness check and the bump and still be
+ * counted. Returns true iff a row was counted.
+ */
+export function bumpCopyCountIfLive(db: Database, slug: string, nowMs: number): boolean {
+	const res = db
+		.query(
+			`UPDATE capsules SET copy_count = copy_count + 1
+       WHERE slug = ? AND deleted_at IS NULL AND expires_at > ? AND moderation_status != 'blocked'`
+		)
+		.run(slug, new Date(nowMs).toISOString());
+	return res.changes > 0;
+}
+
 // ---- moderation (publish-then-review worker) ----------------------------
 
 /**

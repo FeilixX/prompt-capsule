@@ -3,9 +3,18 @@
 	import VoidScene from '$lib/components/VoidScene.svelte';
 	import TapeCta from '$lib/components/TapeCta.svelte';
 	import { t } from '$lib/i18n.svelte';
+	import { clarityEvent, bumpCopyCount, copyText } from '$lib/client';
 
 	let { data }: { data: PageData } = $props();
 	let copied = $state('');
+
+	// Funnel signal: how often people land on a dead (expired/deleted) tape vs a live one.
+	// Keyed on data.slug so a client-side nav to another tape (SvelteKit reuses this component)
+	// re-fires the classification instead of missing it — $effect only runs in the browser.
+	$effect(() => {
+		void data.slug;
+		clarityEvent(data.active ? 'view_active' : 'view_expired');
+	});
 
 	// delete-with-token: only the creator (who kept the token) can delete.
 	let token = $state('');
@@ -34,9 +43,13 @@
 	});
 
 	async function copy(text: string, which: string) {
-		await navigator.clipboard.writeText(text);
-		copied = which;
-		setTimeout(() => (copied = ''), 1400);
+		const ok = await copyText(text);
+		if (ok) {
+			copied = which;
+			setTimeout(() => (copied = ''), 1400);
+		}
+		clarityEvent(ok ? 'copy_' + which : 'copy_fail');
+		if (ok) bumpCopyCount(data.slug);
 	}
 
 	async function doDelete() {
@@ -51,6 +64,7 @@
 			});
 			if (res.ok) {
 				viewDeleted = true;
+				clarityEvent('tape_deleted');
 			} else {
 				const d = await res.json();
 				delErr = res.status === 403 ? t('v_del_wrong') : (d.message ?? d.error ?? t('v_del_fail'));

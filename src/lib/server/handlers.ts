@@ -8,6 +8,7 @@ import {
 	getCapsuleRaw,
 	deleteCapsule,
 	bumpViewCount,
+	bumpCopyCountIfLive,
 	isBlocked
 } from './capsules';
 import { buildTextBody } from './body';
@@ -117,6 +118,18 @@ export function renderCapsuleText(db: Database, slug: string, nowMs: number): Te
 	}
 	bumpViewCount(db, slug);
 	return { status: 200, contentType: PLAIN, body: buildTextBody(active, nowMs) };
+}
+
+// ---- copy telemetry -----------------------------------------------------
+
+/**
+ * Record one reader copy of a capsule (the /view copy buttons). Delegates to an atomic
+ * conditional UPDATE so missing / expired / blocked / deleted slugs are ignored — copy_count
+ * reflects real copies of readable capsules, and a bot POSTing random slugs can't inflate it.
+ * Returns true iff a row was counted.
+ */
+export function recordCopy(db: Database, slug: string, nowMs: number): boolean {
+	return bumpCopyCountIfLive(db, slug, nowMs);
 }
 
 // ---- delete -------------------------------------------------------------
