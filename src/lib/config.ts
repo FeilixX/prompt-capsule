@@ -1,14 +1,15 @@
 /**
  * DeepSeek-backed content moderation for the publish-then-review worker.
- * All values are config so the same code runs locally (behind the Mac Hiddify proxy)
- * and on aliyun (direct). `enabled=false` OR an empty apiKey makes the worker a no-op.
+ * All values are config so the same code runs locally (behind an outbound proxy if the
+ * dev machine needs one) and in production (direct). `enabled=false` OR an empty apiKey
+ * makes the worker a no-op.
  */
 export interface ModerationConfig {
 	enabled: boolean;
 	deepseekApiKey: string;
 	deepseekBaseUrl: string;
 	deepseekModel: string;
-	proxyUrl: string; // '' = direct connect (aliyun); set to Hiddify for Mac-local testing
+	proxyUrl: string; // '' = direct connect; set a local HTTP proxy for dev-machine testing
 	batchSize: number;
 	intervalSec: number;
 	maxAttempts: number; // retries before fail-open: after this many failed rounds a capsule is auto-approved

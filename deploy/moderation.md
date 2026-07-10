@@ -7,7 +7,7 @@ Publish-then-review content moderation. Capsules go live immediately as `pending
 the MCP `read_prompt_tape` tool.
 
 The worker opens `data/capsules.db` directly, so it runs on the **same host as the web
-app** (aliyun-bj), not remotely. Because it is bundled, only `build/` needs to be on the server —
+app** (the production host), not remotely. Because it is bundled, only `build/` needs to be on the server —
 no `src/` tree required (the DB opens with `busy_timeout` so web + worker can write concurrently).
 
 ## 1. Server env (`/opt/capsule/.env`, gitignored)
@@ -15,7 +15,7 @@ no `src/` tree required (the DB opens with `busy_timeout` so web + worker can wr
 ```
 DEEPSEEK_API_KEY=sk-...        # required; empty => worker no-ops
 MODERATION_ENABLED=true        # master switch
-DEEPSEEK_PROXY=                # empty on aliyun/CN (direct); Hiddify only for Mac-local
+DEEPSEEK_PROXY=                # empty = direct connect; set a local proxy only for dev machines
 # optional overrides (defaults shown):
 # DEEPSEEK_MODEL=deepseek-v4-flash
 # MODERATION_BATCH_SIZE=20        (clamped 1..50; out-of-range falls back to default)

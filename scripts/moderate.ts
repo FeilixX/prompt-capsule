@@ -41,7 +41,7 @@ function makeDeepseekCaller(): DeepseekCaller {
 			body: JSON.stringify(buildDeepseekRequestBody(system, user, m.deepseekModel, MAX_OUTPUT_TOKENS)),
 			// A hung request must not stall the loop; AbortSignal.timeout rejects, we back off.
 			signal: AbortSignal.timeout(m.timeoutSec * 1000),
-			// bun-only: route via Hiddify on Mac; empty proxyUrl => direct connect (aliyun/CN)
+			// bun-only: optional outbound proxy for dev machines; empty proxyUrl => direct connect
 			...(m.proxyUrl ? { proxy: m.proxyUrl } : {})
 		});
 		if (!res.ok) throw new Error(`deepseek HTTP ${res.status}`);

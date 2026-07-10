@@ -15,7 +15,7 @@ Type=simple
 WorkingDirectory=__DEPLOY_DIR__
 # __RUN_USER__ = the account that owns data/capsules.db (match the web service's User=).
 User=__RUN_USER__
-# .env carries DEEPSEEK_API_KEY, MODERATION_ENABLED=true, DB_PATH, and (on aliyun/CN) an
+# .env carries DEEPSEEK_API_KEY, MODERATION_ENABLED=true, DB_PATH, and (if needed) an
 # empty DEEPSEEK_PROXY for a direct connect. Never commit this file (secret-zero).
 EnvironmentFile=__DEPLOY_DIR__/.env
 # __BUN_PATH__ = absolute path to a bun binary the __RUN_USER__ can execute. Do NOT point into

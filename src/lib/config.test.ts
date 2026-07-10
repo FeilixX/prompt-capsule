@@ -64,7 +64,7 @@ test('loadConfig: moderation overrides parse from env', () => {
 		MODERATION_ENABLED: 'true',
 		DEEPSEEK_API_KEY: 'sk-x',
 		DEEPSEEK_MODEL: 'deepseek-v4-pro',
-		DEEPSEEK_PROXY: 'http://127.0.0.1:12334',
+		DEEPSEEK_PROXY: 'http://127.0.0.1:7890',
 		MODERATION_BATCH_SIZE: '5',
 		MODERATION_INTERVAL_SEC: '30',
 		MODERATION_MAX_ATTEMPTS: '2',
@@ -73,7 +73,7 @@ test('loadConfig: moderation overrides parse from env', () => {
 	expect(m.enabled).toBe(true);
 	expect(m.deepseekApiKey).toBe('sk-x');
 	expect(m.deepseekModel).toBe('deepseek-v4-pro');
-	expect(m.proxyUrl).toBe('http://127.0.0.1:12334');
+	expect(m.proxyUrl).toBe('http://127.0.0.1:7890');
 	expect(m.batchSize).toBe(5);
 	expect(m.intervalSec).toBe(30);
 	expect(m.maxAttempts).toBe(2);
