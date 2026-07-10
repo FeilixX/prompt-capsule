@@ -44,7 +44,9 @@ Every tape has two URLs:
 
 - **Plain text, agent-first.** `/c/{slug}` is a clean `text/plain` endpoint — no HTML, no JS, nothing to scrape.
 - **Agent-native.** A remote MCP server and an installable Skill let an agent make, read, and delete tapes on its own.
+- **Codes, not just links.** The URL tail *is* the tape's code. Share the bare code on platforms that downrank links; any agent with the Skill/MCP resolves it. Operators can also mint [**program codes**](#program-codes) — stable aliases that survive weekly renewals.
 - **Short-lived.** 1 hour / 1 day / 7 days, then auto-cleared. Not a database of forever-prompts.
+- **Optional moderation.** Publish-then-review via an out-of-band DeepSeek worker ([deploy/moderation.md](deploy/moderation.md)); a blocked tape reads as 404, as if it never existed.
 - **Delete key.** Each tape gets a one-time delete token; only the holder can kill it early.
 - **No accounts.** Anonymous create, rate-limited.
 - **Private by default.** Content lives server-side, is never indexed (`noindex`), and is never used for training.
@@ -92,11 +94,13 @@ curl -X POST https://n78.xyz/api/capsules \
 
 ```jsonc
 {
-  "slug": "a8K2mQp9",
+  "slug": "a8K2mQp9",                           // = the tape's code
   "url": "https://n78.xyz/c/a8K2mQp9",         // raw text/plain
   "view_url": "https://n78.xyz/view/a8K2mQp9",  // human page
   "expires_at": "2026-07-12T00:00:00.000Z",
-  "delete_token": "…"                           // keep it to delete early
+  "delete_token": "…",                          // keep it to delete early
+  "code_share_text": "…",                       // URL-free share line (for link-downranking platforms)
+  "agent_text": "…"                             // ready-made "fetch this and run it" line
 }
 ```
 
@@ -130,8 +134,8 @@ Then ask your agent to seal a block of text into a tape, and it calls the tool.
 
 | Tool | Args | Returns |
 |------|------|---------|
-| `create_prompt_tape` | `content`, `title?`, `ttl_seconds?` | `view_url`, `raw_url`, `delete_token`, `expires_at`, `agent_text` |
-| `read_prompt_tape` | `target` (slug or URL) | the tape's text |
+| `create_prompt_tape` | `content`, `title?`, `ttl_seconds?` | `view_url`, `raw_url`, `code`, `code_share_text`, `delete_token`, `expires_at`, `agent_text` |
+| `read_prompt_tape` | `target` (code, program code, or URL) | the tape's text |
 | `delete_prompt_tape` | `slug`, `delete_token` | `deleted` |
 
 ### Skill, installable
@@ -139,6 +143,25 @@ Then ask your agent to seal a block of text into a tape, and it calls the tool.
 [`skills/prompt-tape/`](skills/prompt-tape/) is a `SKILL.md` bundle for platforms that install Skills. It tells an agent when to offer a tape and how to make one, with three fallbacks: the MCP tool if it has one, otherwise the bundled `client.js` over HTTP, otherwise a nudge to the site. Upload the folder wherever your platform takes Skills.
 
 Both share the HTTP API contract: `content` up to 16 KB, `ttl_seconds` up to 7 days. Full walkthrough at [n78.xyz/skill](https://n78.xyz/skill).
+
+## Program codes
+
+A tape dies in ≤ 7 days — that's the point. But a code printed in a long-lived post shouldn't rot with it. A **program code** is an operator-owned stable alias (say `CHIBI01`) that points at the *current* tape. Readers use it exactly like a tape code — `GET /c/CHIBI01`, case-insensitive, same everywhere the code works — and never notice the weekly swap underneath. Renewing mints a fresh tape with the same content and repoints the alias in one transaction; the old tape lives out its own clock, and a program you stop renewing goes "off air" within 7 days. The TTL contract on every individual tape is untouched.
+
+The admin surface is Bearer-gated and **off by default** — with `ADMIN_TOKEN` empty, every `/api/programs*` route answers 404:
+
+| Endpoint | Does |
+|---|---|
+| `PUT /api/programs/{name}` | create or repoint — body `{"slug":"…","note":"…"}` |
+| `POST /api/programs/{name}/renew` | weekly swap: new tape, same content, alias repointed atomically |
+| `GET /api/programs` | list programs with current expiry and lifetime hits |
+| `DELETE /api/programs/{name}` | drop the alias; the current tape is untouched |
+
+Weekly ops is one command:
+
+```bash
+ADMIN_TOKEN=… bun scripts/renew.ts CHIBI01   # prints the new expiry + ready-to-paste share text
+```
 
 ## Configuration
 
@@ -153,6 +176,10 @@ Everything is env-driven — see [`.env.example`](.env.example):
 | `DEFAULT_TTL_SECONDS` / `MAX_TTL_SECONDS` | `604800` | TTL, in seconds (7 days) |
 | `SLUG_LENGTH` | `8` | Base62 slug length |
 | `DB_PATH` | `./data/capsules.db` | SQLite file |
+| `ADMIN_TOKEN` | *(empty)* | Bearer token for `/api/programs*`. Empty = surface disabled (404); non-empty but < 32 bytes refuses to boot |
+| `PUBLIC_ICP_FILING` | *(empty)* | CN ICP filing number for the footer, injected at runtime — never hardcode yours |
+| `PUBLIC_CLARITY_ID` | *(empty)* | Microsoft Clarity project id, injected at runtime. Empty = analytics fully disabled; only ever loads on the exact `PUBLIC_BASE_URL` host |
+| `MODERATION_*` / `DEEPSEEK_*` | *(disabled)* | Content-moderation worker knobs — see [deploy/moderation.md](deploy/moderation.md) |
 
 ## License
 

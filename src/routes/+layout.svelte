@@ -71,8 +71,10 @@
 	// Microsoft Clarity — anonymous usage stats + heatmaps. Prompt content and the
 	// delete token are masked (inputs auto-mask; the non-input prompt/title/token
 	// carry data-clarity-mask), so nothing a user types or views is ever uploaded.
-	// Public, non-secret project id; override via PUBLIC_CLARITY_ID, empty to disable.
-	const CLARITY_ID = env.PUBLIC_CLARITY_ID ?? 'xhnibg6pub';
+	// Set via PUBLIC_CLARITY_ID at runtime; empty/unset = analytics disabled. No baked-in
+	// default on purpose: PROD_HOST follows PUBLIC_BASE_URL, so a hardcoded id would silently
+	// pour every self-hoster's production traffic into the maintainer's dashboard.
+	const CLARITY_ID = env.PUBLIC_CLARITY_ID ?? '';
 	// Only load Clarity on the canonical production host — an allowlist, not a denylist. A
 	// hostname denylist can never enumerate every non-prod host (LAN IP, staging, tunnel), so a
 	// preview build served anywhere but here simply never touches the prod dashboard.

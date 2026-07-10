@@ -44,7 +44,9 @@
 
 - **纯文本，机器优先。** `/c/{slug}` 是干净的 `text/plain` 端点 —— 没 HTML、没 JS、没得爬。
 - **agent 原生。** 一个远程 MCP 服务 + 一个可安装 Skill，让 agent 能自己创建、读、删卡带。
+- **编码，不只是链接。** URL 尾巴那段就是卡带的「编码」。在发链接会被降权的平台只发裸编码,装了 Skill/MCP 的 agent 自己能取回;运营者还能铸[**节目码**](#节目码)—— 每周换带也不变的长期别名。
 - **短命。** 1 小时 / 1 天 / 7 天，到点自动清空。不是一个存到天荒地老的提示词库。
+- **可选内容审核。** 先发后审,带外 DeepSeek worker 批量判([deploy/moderation.md](deploy/moderation.md));被拦的卡带对外读作 404,像从未存在过。
 - **删除口令。** 每盘卡带一枚一次性删除口令；只有握着它的人能提前删掉。
 - **不用注册。** 匿名创建，带限流。
 - **默认私密。** 内容存服务端，不被搜索引擎收录（`noindex`），也不拿去训练。
@@ -93,11 +95,13 @@ curl -X POST https://n78.xyz/api/capsules \
 
 ```jsonc
 {
-  "slug": "a8K2mQp9",
+  "slug": "a8K2mQp9",                           // = 卡带编码
   "url": "https://n78.xyz/c/a8K2mQp9",         // 原始 text/plain
   "view_url": "https://n78.xyz/view/a8K2mQp9",  // 人看的页面
   "expires_at": "2026-07-12T00:00:00.000Z",
-  "delete_token": "…"                           // 存好它,用来提前删
+  "delete_token": "…",                          // 存好它,用来提前删
+  "code_share_text": "…",                       // 只含编码、无 URL 的分享串(防链接降权)
+  "agent_text": "…"                             // 现成的「打开这个链接照着做」话术
 }
 ```
 
@@ -131,8 +135,8 @@ curl -X POST https://n78.xyz/api/capsules/a8K2mQp9/delete \
 
 | 工具 | 参数 | 返回 |
 |------|------|------|
-| `create_prompt_tape` | `content`、`title?`、`ttl_seconds?` | `view_url`、`raw_url`、`delete_token`、`expires_at`、`agent_text` |
-| `read_prompt_tape` | `target`(slug 或 URL) | 卡带正文 |
+| `create_prompt_tape` | `content`、`title?`、`ttl_seconds?` | `view_url`、`raw_url`、`code`、`code_share_text`、`delete_token`、`expires_at`、`agent_text` |
+| `read_prompt_tape` | `target`(编码、节目码或 URL) | 卡带正文 |
 | `delete_prompt_tape` | `slug`、`delete_token` | `deleted` |
 
 ### Skill，可安装
@@ -140,6 +144,25 @@ curl -X POST https://n78.xyz/api/capsules/a8K2mQp9/delete \
 [`skills/prompt-tape/`](skills/prompt-tape/) 是个 `SKILL.md` 包，给支持安装 Skill 的平台用。它教 agent 什么时候提议做卡带、怎么做，带三层兜底：有 MCP 工具就调，没有就用自带 `client.js` 打 HTTP，再不行就把用户引到站点。你的平台能装 Skill，就把这个文件夹传上去。
 
 两条都走 HTTP API 那套契约：`content` 上限 16 KB，`ttl_seconds` 上限 7 天。完整走一遍：[n78.xyz/skill](https://n78.xyz/skill)。
+
+## 节目码
+
+卡带 7 天必死 —— 这是产品姿态。但印在一篇长命帖子里的编码不该跟着烂。**节目码**是运营者自己铸的长期别名(比如 `CHIBI01`),永远指向「当期卡带」。读者用它跟用卡带编码一模一样 —— `GET /c/CHIBI01`,大小写不敏感,哪里认编码哪里就认它 —— 底下每周换带对读者完全不可见。换带(renew)= 同正文新建一盘卡带 + 一个事务里原子重指;旧带按自己的钟走完,不续期的节目 ≤7 天内「停播」。每盘卡带各自的 TTL 契约一秒不改。
+
+admin 面走 Bearer 鉴权,**默认关闭** —— `ADMIN_TOKEN` 为空时所有 `/api/programs*` 路由一律 404:
+
+| 端点 | 干什么 |
+|---|---|
+| `PUT /api/programs/{name}` | 建节目 / 手动重指 —— body `{"slug":"…","note":"…"}` |
+| `POST /api/programs/{name}/renew` | 每周换带:同正文新卡带,别名原子重指 |
+| `GET /api/programs` | 节目列表:当期到期时间 + 跨换带累计取回数 |
+| `DELETE /api/programs/{name}` | 删别名;当期卡带不动 |
+
+周常运维就一条命令:
+
+```bash
+ADMIN_TOKEN=… bun scripts/renew.ts CHIBI01   # 打印新到期时间 + 可直接粘贴的分享文案
+```
 
 ## 配置
 
@@ -154,6 +177,10 @@ curl -X POST https://n78.xyz/api/capsules/a8K2mQp9/delete \
 | `DEFAULT_TTL_SECONDS` / `MAX_TTL_SECONDS` | `604800` | 有效期，秒（7 天）|
 | `SLUG_LENGTH` | `8` | base62 slug 长度 |
 | `DB_PATH` | `./data/capsules.db` | SQLite 文件 |
+| `ADMIN_TOKEN` | *(空)* | `/api/programs*` 的 Bearer token。空 = 整个面禁用(404);非空但 < 32 字节直接拒绝启动 |
+| `PUBLIC_ICP_FILING` | *(空)* | 页脚 ICP 备案号,运行时注入 —— 永远别把你的备案号写死进代码 |
+| `PUBLIC_CLARITY_ID` | *(空)* | Microsoft Clarity 项目 id,运行时注入。空 = 统计完全关闭;只在 `PUBLIC_BASE_URL` 的精确 host 上加载 |
+| `MODERATION_*` / `DEEPSEEK_*` | *(关闭)* | 内容审核 worker 的旋钮 —— 见 [deploy/moderation.md](deploy/moderation.md) |
 
 ## 许可
 
