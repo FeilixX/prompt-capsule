@@ -8,6 +8,14 @@ export {};
 const BASE = process.env.BASE ?? 'http://127.0.0.1:3117';
 let failures = 0;
 
+// 自测流量必须带 n78-selftest UA:Caddy access log 按它标 traffic=self;
+// 本机出口走代理(机房 IP 段),UA 是唯一可靠的自测标记。
+const origFetch = globalThis.fetch;
+globalThis.fetch = ((input: Parameters<typeof fetch>[0], init: RequestInit = {}) => {
+	init.headers = { ...(init.headers ?? {}), 'User-Agent': 'n78-selftest/1.0' };
+	return origFetch(input, init);
+}) as typeof fetch;
+
 function check(name: string, cond: boolean, detail = '') {
 	console.log(`${cond ? 'PASS' : 'FAIL'}  ${name}${detail ? '  — ' + detail : ''}`);
 	if (!cond) failures++;
@@ -112,6 +120,110 @@ const mGone = await mcpRpc('tools/call', { name: 'read_prompt_tape', arguments: 
 check('MCP read after delete → gone', mGone.body?.result?.structuredContent?.error?.code === 'gone');
 const mGet = await fetch(`${BASE}/mcp`);
 check('GET /mcp → 405', mGet.status === 405, `status=${mGet.status}`);
+
+// 8) program codes (节目码) — full lifecycle. Needs the operator token; without it the
+// section SKIPs (admin surface is disabled/unreachable), it does not FAIL.
+const ADMIN_TOKEN = process.env.ADMIN_TOKEN ?? '';
+if (ADMIN_TOKEN === '') {
+	console.log('SKIP  program-code section (set ADMIN_TOKEN to exercise /api/programs*)');
+} else {
+	const auth = { Authorization: `Bearer ${ADMIN_TOKEN}` };
+	// unique per run; [A-Za-z0-9]{4,32} and never exactly 8 chars (anti-shadow rule)
+	let progName = 'SMK' + Date.now().toString(36).toUpperCase();
+	if (progName.length === 8) progName += 'X';
+
+	const pCreate = await fetch(`${BASE}/api/capsules`, {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({ content: '节目码 smoke 正文 ' + progName, ttl_seconds: 3600 })
+	});
+	const pTape = await pCreate.json();
+	check('program: setup tape created', pCreate.status === 201, `status=${pCreate.status}`);
+
+	// admin auth three states (empty-token-404 lives in unit tests; a live site has a token)
+	const noAuth = await fetch(`${BASE}/api/programs/${progName}`, {
+		method: 'PUT',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({ slug: pTape.slug })
+	});
+	check('program: PUT without Authorization → 401', noAuth.status === 401, `status=${noAuth.status}`);
+	const badAuth = await fetch(`${BASE}/api/programs/${progName}`, {
+		method: 'PUT',
+		headers: { 'Content-Type': 'application/json', Authorization: 'Bearer wrong-token' },
+		body: JSON.stringify({ slug: pTape.slug })
+	});
+	check('program: PUT with wrong token → 401', badAuth.status === 401, `status=${badAuth.status}`);
+
+	const put = await fetch(`${BASE}/api/programs/${progName}`, {
+		method: 'PUT',
+		headers: { 'Content-Type': 'application/json', ...auth },
+		body: JSON.stringify({ slug: pTape.slug, note: 'smoke run' })
+	});
+	check('program: PUT with right token → 200', put.status === 200, `status=${put.status}`);
+
+	// resolution via /c — exact, case variant, and body equality modulo the cache-buster
+	const stripBuster = (s: string) => s.replace(/<!-- t=\d+ -->/, '');
+	const viaProg = await fetch(`${BASE}/c/${progName}`);
+	const viaProgBody = await viaProg.text();
+	check('program: GET /c/{节目码} → 200', viaProg.status === 200, `status=${viaProg.status}`);
+	const viaSlug = await fetch(`${BASE}/c/${pTape.slug}`);
+	check(
+		'program: body matches /c/{slug} (modulo cache-buster)',
+		stripBuster(viaProgBody) === stripBuster(await viaSlug.text())
+	);
+	const viaLower = await fetch(`${BASE}/c/${progName.toLowerCase()}`);
+	check('program: case-insensitive resolve → 200', viaLower.status === 200, `status=${viaLower.status}`);
+
+	// /view via program: 200 and share surfaces carry the PROGRAM form of the URL
+	const viewProg = await fetch(`${BASE}/view/${progName}`);
+	const viewProgBody = await viewProg.text();
+	check('program: GET /view/{节目码} → 200', viewProg.status === 200, `status=${viewProg.status}`);
+	check('program: /view shares the program-form URL', viewProgBody.includes(`/c/${progName}`));
+
+	// renew: program resolves to a NEW tape; the old slug keeps living on its own TTL
+	const renew = await fetch(`${BASE}/api/programs/${progName}/renew`, {
+		method: 'POST',
+		headers: auth
+	});
+	const renewed = await renew.json();
+	check('program: POST renew → 200', renew.status === 200, `status=${renew.status}`);
+	check('program: renew minted a new slug', !!renewed.slug && renewed.slug !== pTape.slug);
+	check('program: renew share text carries the program code', String(renewed.code_share_text ?? '').includes(progName));
+	const afterRenew = await fetch(`${BASE}/c/${progName}`);
+	check(
+		'program: resolves to new tape after renew',
+		afterRenew.status === 200 && stripBuster(await afterRenew.text()) === stripBuster(viaProgBody)
+	);
+	const oldSlug = await fetch(`${BASE}/c/${pTape.slug}`);
+	check('program: old slug still 200 on its own TTL', oldSlug.status === 200, `status=${oldSlug.status}`);
+
+	// hits accumulated across the swap
+	const list = await fetch(`${BASE}/api/programs`, { headers: auth });
+	const listBody = await list.json();
+	const entry = (listBody.programs ?? []).find((p: { name: string }) => p.name === progName);
+	check('program: GET list → 200 with entry', list.status === 200 && !!entry);
+	check('program: hits accumulated (≥3)', (entry?.hits ?? 0) >= 3, `hits=${entry?.hits}`);
+
+	// MCP read via program code
+	const mProg = await mcpRpc('tools/call', { name: 'read_prompt_tape', arguments: { target: progName } }, 6);
+	check('program: MCP read via 节目码 → not error', mProg.body?.result?.isError !== true);
+
+	// cleanup: delete the program pointer, then both tapes; program then 404s
+	const pDel = await fetch(`${BASE}/api/programs/${progName}`, { method: 'DELETE', headers: auth });
+	check('program: DELETE → 200', pDel.status === 200, `status=${pDel.status}`);
+	const afterDel = await fetch(`${BASE}/c/${progName}`);
+	check('program: 404 after pointer deleted', afterDel.status === 404, `status=${afterDel.status}`);
+	const oldStill = await fetch(`${BASE}/c/${pTape.slug}`);
+	check('program: old slug untouched by pointer delete', oldStill.status === 200, `status=${oldStill.status}`);
+	// cleanup: the original tape via its token. The RENEWED tape has no exposed
+	// delete_token by design (renew never returns kill credentials) — it is benign
+	// self-marked test content and dies on its own TTL.
+	await fetch(`${BASE}/api/capsules/${pTape.slug}/delete`, {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({ delete_token: pTape.delete_token })
+	});
+}
 
 console.log(failures === 0 ? '\nALL GREEN' : `\n${failures} FAILURES`);
 process.exit(failures === 0 ? 0 : 1);

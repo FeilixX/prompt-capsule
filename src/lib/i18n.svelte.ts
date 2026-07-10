@@ -139,6 +139,8 @@ const ZH: Dict = {
 	// void / 404
 	void_line: '这盘卡带过期或被删了，内容已经清空 —— 短命封装，本来就该这样。',
 	void_cta: '封一盘新的',
+	// program off-air (节目码指向的当期卡带已过期,等换带)
+	offair_line: '本期卡带已下带，新一期马上换上 —— 每周换带，口令不变，过两天再来试。',
 	e404_line: '这儿没有这盘卡带 —— 可能过期了、被删了，或者压根没录过。',
 	e404_cta: '回首页',
 
@@ -311,6 +313,7 @@ const EN: Dict = {
 
 	void_line: "This tape expired or got deleted, and the content's gone — a short life is the whole point.",
 	void_cta: 'Seal a new one',
+	offair_line: "This episode's tape is off air — a new one swaps in soon. Same code, come back in a day or two.",
 	e404_line: 'No tape here — expired, deleted, or never recorded in the first place.',
 	e404_cta: 'Back home',
 

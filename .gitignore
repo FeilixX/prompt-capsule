@@ -50,3 +50,6 @@ docs/superpowers/
 skills/xhs/
 skills/*.zip
 skills/xhs.zip
+
+# codex session state (tooling, not product)
+.context/

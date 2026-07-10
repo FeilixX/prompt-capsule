@@ -26,6 +26,13 @@ test('loadConfig parses overrides from string env', () => {
 	expect(c.slugLength).toBe(10);
 });
 
+test('ADMIN_TOKEN: empty = disabled (legal); short = boot failure; 32+ bytes = armed', () => {
+	expect(loadConfig({}).adminToken).toBe('');
+	expect(() => loadConfig({ ADMIN_TOKEN: 'weak-token' })).toThrow(/32 bytes/);
+	const strong = 'x'.repeat(32);
+	expect(loadConfig({ ADMIN_TOKEN: strong }).adminToken).toBe(strong);
+});
+
 test('clampTtl uses default when requested is missing or non-positive', () => {
 	const c = loadConfig({});
 	expect(clampTtl(c, undefined)).toBe(604800);

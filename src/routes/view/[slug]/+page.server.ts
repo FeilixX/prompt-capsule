@@ -1,27 +1,13 @@
 import type { PageServerLoad } from './$types';
 import { error } from '@sveltejs/kit';
 import { getDb, config } from '$lib/server/db';
-import { getCapsuleRaw, getActiveCapsule, isBlocked } from '$lib/server/capsules';
+import { loadViewData } from '$lib/server/handlers';
 
+// Thin shell: the path segment is a capsule slug or a program code; all branch
+// semantics (off-air metadata hygiene, blocked-404, program-form share URLs)
+// live in loadViewData where they are unit-tested.
 export const load: PageServerLoad = ({ params }) => {
-	const db = getDb();
-	const raw = getCapsuleRaw(db, params.slug);
-	// Blocked capsules 404 like a missing slug (never expose that it was live then removed).
-	if (!raw || isBlocked(raw)) throw error(404, 'capsule not found');
-
-	const active = getActiveCapsule(db, params.slug, Date.now());
-	const url = `${config.publicBaseUrl}${config.routePrefix}/${raw.slug}`;
-	const display = url.replace(/^https?:\/\//, '');
-
-	return {
-		slug: raw.slug,
-		title: raw.title,
-		content: active ? raw.content : null,
-		active: active !== null,
-		createdAt: raw.created_at,
-		expiresAt: raw.expires_at,
-		url,
-		display,
-		agentText: `打开这个链接，按里面的内容执行：${url}`
-	};
+	const data = loadViewData(getDb(), config, params.slug, Date.now());
+	if (!data) throw error(404, 'capsule not found');
+	return data;
 };

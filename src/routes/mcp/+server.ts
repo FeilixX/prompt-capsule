@@ -43,7 +43,8 @@ function buildServer(clientIp: string): McpServer {
 	server.registerTool(
 		'read_prompt_tape',
 		{
-			description: '读取一个卡带的正文。target 可以是 slug 或完整 URL(/c/… 或 /view/…)。',
+			description:
+				'读取一个卡带的正文。target 可以是卡带编码(slug)、节目码(长期栏目别名,大小写不敏感)或完整 URL(/c/… 或 /view/…)。',
 			inputSchema: z.object({ target: z.string().describe('slug 或卡带 URL') })
 		},
 		async (args) => toResult(mcpRead(deps(), args))

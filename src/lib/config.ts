@@ -24,6 +24,8 @@ export interface Config {
 	maxTtlSeconds: number;
 	slugLength: number;
 	dbPath: string;
+	/** Bearer token for the operator-only /api/programs* surface. Empty = surface disabled (404). */
+	adminToken: string;
 	moderation: ModerationConfig;
 }
 
@@ -59,8 +61,21 @@ function intInRange(env: Env, key: string, fallback: number, min: number, max: n
 	return Number.isFinite(n) && n >= min && n <= max ? n : fallback;
 }
 
-/** Build the runtime config from an env bag. Pure — no process.env access, so it is testable. */
+/**
+ * Build the runtime config from an env bag. Pure — no process.env access, so it is testable.
+ * Fail-fast validation lives here (config-over-code): a misconfiguration should kill the
+ * boot with a clear message, not silently run in a weaker-than-intended state.
+ */
 export function loadConfig(env: Env): Config {
+	const adminToken = str(env, 'ADMIN_TOKEN', '');
+	// Non-empty means "admin surface armed" — refuse weak tokens outright rather than
+	// letting a guessable one pretend the surface is protected. Empty stays legal (= disabled).
+	if (adminToken !== '' && new TextEncoder().encode(adminToken).length < 32) {
+		throw new Error(
+			'ADMIN_TOKEN is set but shorter than 32 bytes. Use a strong random token ' +
+				'(e.g. `openssl rand -base64 32`) or leave it empty to disable the admin surface.'
+		);
+	}
 	return {
 		publicBaseUrl: str(env, 'PUBLIC_BASE_URL', 'https://n78.xyz'),
 		allowedHosts: str(env, 'ALLOWED_HOSTS', 'n78.xyz')
@@ -73,6 +88,7 @@ export function loadConfig(env: Env): Config {
 		maxTtlSeconds: num(env, 'MAX_TTL_SECONDS', 604800),
 		slugLength: num(env, 'SLUG_LENGTH', 8),
 		dbPath: str(env, 'DB_PATH', './data/capsules.db'),
+		adminToken,
 		moderation: {
 			enabled: bool(env, 'MODERATION_ENABLED', false),
 			deepseekApiKey: str(env, 'DEEPSEEK_API_KEY', ''),

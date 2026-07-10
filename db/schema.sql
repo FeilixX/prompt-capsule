@@ -31,3 +31,18 @@ CREATE INDEX IF NOT EXISTS idx_capsules_expires ON capsules(expires_at);
 -- AFTER adding the moderation columns. If this file were run (sqlite3 < schema.sql) against an
 -- existing pre-moderation DB, CREATE TABLE IF NOT EXISTS no-ops and an index on the not-yet-added
 -- moderation_status column would throw "no such column". The app builds it on first open.
+
+-- Programs table (节目码): operator-owned stable aliases pointing at the current tape.
+-- CANONICAL SOURCE: src/lib/server/programs.ts (PROGRAMS_SCHEMA_SQL). Keep in sync.
+-- A program stores NO content — current_slug points at capsules.slug (no FK on purpose,
+-- matching the schema style; dangling pointers are handled defensively at read time).
+
+CREATE TABLE IF NOT EXISTS programs (
+  name         TEXT PRIMARY KEY,        -- display form, e.g. 'CHIBI01'
+  name_lower   TEXT UNIQUE NOT NULL,    -- case-insensitive lookup key
+  current_slug TEXT NOT NULL,           -- current tape (capsules.slug)
+  note         TEXT,                    -- operator memo
+  hits         INTEGER NOT NULL DEFAULT 0,  -- lifetime 200-reads via this program, survives renewals
+  created_at   TEXT NOT NULL,           -- ISO8601
+  updated_at   TEXT NOT NULL            -- ISO8601, refreshed on repoint/renew
+);

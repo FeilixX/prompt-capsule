@@ -1,6 +1,6 @@
 import type { Database } from 'bun:sqlite';
 import type { Config } from '../config';
-import { createCapsuleFromInput, renderCapsuleText, deleteCapsuleByToken } from './handlers';
+import { createCapsuleFromInput, renderTape, deleteCapsuleByToken } from './handlers';
 import { checkRateLimit } from './rateLimit';
 import { CREATE_RATE } from './limits';
 
@@ -105,8 +105,9 @@ export function slugFromTarget(target: string): string {
 }
 
 export function mcpRead(deps: McpDeps, input: { target: string }): McpResult {
+	// The extracted token may be a capsule slug OR a program code — renderTape resolves both.
 	const slug = slugFromTarget(input.target);
-	const res = renderCapsuleText(deps.db, slug, deps.nowMs);
+	const res = renderTape(deps.db, deps.config, slug, deps.nowMs);
 	if (res.status === 200) {
 		logTool('read', deps.clientIp, true);
 		return ok(res.body);

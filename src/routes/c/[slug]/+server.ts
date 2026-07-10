@@ -1,10 +1,11 @@
 import type { RequestHandler } from './$types';
-import { getDb } from '$lib/server/db';
-import { renderCapsuleText } from '$lib/server/handlers';
+import { getDb, config } from '$lib/server/db';
+import { renderTape } from '$lib/server/handlers';
 
 // Pure text/plain endpoint for agents and humans. Never wrap in HTML.
+// The path segment is a capsule slug or a program code (节目码) — renderTape resolves.
 export const GET: RequestHandler = ({ params }) => {
-	const out = renderCapsuleText(getDb(), params.slug, Date.now());
+	const out = renderTape(getDb(), config, params.slug, Date.now());
 	return new Response(out.body, {
 		status: out.status,
 		headers: {

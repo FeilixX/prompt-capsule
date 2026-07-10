@@ -8,12 +8,13 @@
 	let { data }: { data: PageData } = $props();
 	let copied = $state('');
 
-	// Funnel signal: how often people land on a dead (expired/deleted) tape vs a live one.
-	// Keyed on data.slug so a client-side nav to another tape (SvelteKit reuses this component)
-	// re-fires the classification instead of missing it — $effect only runs in the browser.
+	// Funnel signal: how often people land on a dead (expired/deleted/off-air) tape vs a
+	// live one. Keyed per target so a client-side nav to another tape (SvelteKit reuses this
+	// component) re-fires the classification — $effect only runs in the browser. A program
+	// off-air view counts as view_expired: same funnel meaning (arrived, nothing playable).
 	$effect(() => {
-		void data.slug;
-		clarityEvent(data.active ? 'view_active' : 'view_expired');
+		void (data.kind === 'tape' ? data.slug : data.program);
+		clarityEvent(data.kind === 'tape' && data.active ? 'view_active' : 'view_expired');
 	});
 
 	// delete-with-token: only the creator (who kept the token) can delete.
@@ -30,7 +31,7 @@
 		return () => clearInterval(id);
 	});
 	const remaining = $derived.by(() => {
-		if (now === null) return '';
+		if (data.kind !== 'tape' || now === null) return '';
 		const ms = new Date(data.expiresAt).getTime() - now;
 		if (ms <= 0) return '00:00:00';
 		const t = Math.floor(ms / 1000);
@@ -43,6 +44,7 @@
 	});
 
 	async function copy(text: string, which: string) {
+		if (data.kind !== 'tape') return; // only reachable from the tape branch markup
 		const ok = await copyText(text);
 		if (ok) {
 			copied = which;
@@ -53,6 +55,7 @@
 	}
 
 	async function doDelete() {
+		if (data.kind !== 'tape') return;
 		if (deleting || token.trim() === '') return;
 		deleting = true;
 		delErr = '';
@@ -78,12 +81,21 @@
 </script>
 
 <svelte:head>
-	<title>{data.title ?? '提示词卡带'} · Prompt Tape</title>
+	<title>{(data.kind === 'tape' ? data.title : data.program) ?? '提示词卡带'} · Prompt Tape</title>
 	<meta name="robots" content="noindex" />
 </svelte:head>
 
 <main class="page">
-	{#if data.active}
+	{#if data.kind === 'program-offair'}
+		<!-- Program exists but its current tape is dead: nothing about the dead tape leaks
+		     here (no slug/title/dates) — just the program name and "next episode soon". -->
+		<VoidScene
+			line={`「${data.program}」${t('offair_line')}`}
+			ctaLabel={t('void_cta')}
+			ctaSub="NEW TAPE"
+			ctaHref="/"
+		/>
+	{:else if data.active}
 		<!-- HERO: integrated pixel illustration + live text overlays -->
 		<div class="hero">
 			<img src="/sprites/n78/view-hero.png" alt="一盘正在播放的提示词卡带" />

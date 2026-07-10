@@ -3,12 +3,15 @@ import { Database } from 'bun:sqlite';
 import { initSchema } from './capsules';
 import { loadConfig } from '../config';
 import { mcpCreate, mcpRead, mcpDelete, slugFromTarget } from './mcp';
+import { initProgramsSchema, upsertProgram } from './programs';
 
 const config = loadConfig({ PUBLIC_BASE_URL: 'https://n78.xyz' });
 let db: Database;
 beforeEach(() => {
 	db = new Database(':memory:');
 	initSchema(db);
+	// mcpRead resolves through renderTape → programs table must exist (mirrors getDb()).
+	initProgramsSchema(db, config);
 });
 
 function deps(ip = '1.1.1.1', nowMs = 1000) {
@@ -97,4 +100,31 @@ test('mcpDelete removes tape; wrong token -> invalid_token; then gone', () => {
 	const after = mcpRead(deps('1.1.1.1', 1600), { target: slug });
 	expect(after.isError).toBe(true);
 	expect((after.structuredContent as any).error.code).toBe('gone');
+});
+
+// ---- read via program code (节目码) ----
+
+test('mcpRead resolves a program code to the current tape', () => {
+	const c = mcpCreate(deps(), { content: 'episode one' }).structuredContent as Record<
+		string,
+		string
+	>;
+	const up = upsertProgram(db, config, 'CHIBI01', c.code, undefined, 3000);
+	expect(up.ok).toBe(true);
+
+	const r = mcpRead(deps('1.1.1.1', 3000), { target: 'chibi01' }); // case-insensitive
+	expect(r.isError).toBeUndefined();
+	expect(r.content[0].text).toContain('episode one');
+});
+
+test('mcpRead: program whose tape expired → gone with off-air text', () => {
+	const c = mcpCreate(deps(), { content: 'old episode', ttl_seconds: 1 })
+		.structuredContent as Record<string, string>;
+	const up = upsertProgram(db, config, 'CHIBI02', c.code, undefined, 1500);
+	expect(up.ok).toBe(true);
+
+	const r = mcpRead(deps('1.1.1.1', 1500 + 60_000), { target: 'CHIBI02' });
+	expect(r.isError).toBe(true);
+	expect((r.structuredContent as any).error.code).toBe('gone');
+	expect((r.structuredContent as any).error.message).toContain('本期已下带');
 });

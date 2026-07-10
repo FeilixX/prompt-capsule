@@ -9,9 +9,11 @@ import {
 	deleteCapsule,
 	bumpViewCount,
 	bumpCopyCountIfLive,
-	isBlocked
+	isBlocked,
+	type Capsule
 } from './capsules';
 import { buildTextBody } from './body';
+import { resolveTarget, bumpProgramHits } from './programs';
 
 const PLAIN = 'text/plain; charset=utf-8';
 
@@ -118,6 +120,119 @@ export function renderCapsuleText(db: Database, slug: string, nowMs: number): Te
 	}
 	bumpViewCount(db, slug);
 	return { status: 200, contentType: PLAIN, body: buildTextBody(active, nowMs) };
+}
+
+/**
+ * Read a tape by target token: a capsule slug (exact, always wins — byte-for-byte
+ * legacy behavior) or a program code (case-insensitive, resolved to the current tape).
+ *
+ * Program-path semantics (see design §5):
+ * - blocked current tape → the SAME 404 as a direct hit (a program must never leak
+ *   that its tape was taken down);
+ * - expired / deleted / dangling → a program-flavored 410 ("off air, next episode
+ *   soon") instead of the terminal direct-slug 410 — the program code printed in a
+ *   permanent post stays a valid entry point between swaps;
+ * - live → normal 200, counting BOTH the tape's view_count and the program's hits
+ *   (hits survive renewals; view_count resets with each new tape).
+ */
+export function renderTape(db: Database, config: Config, target: string, nowMs: number): TextResult {
+	const resolved = resolveTarget(db, config, target);
+	if (!resolved) {
+		return { status: 404, contentType: PLAIN, body: '404 未找到 / Not found.' };
+	}
+	if (resolved.program === null) {
+		return renderCapsuleText(db, resolved.slug, nowMs);
+	}
+	const raw = getCapsuleRaw(db, resolved.slug);
+	if (raw && isBlocked(raw)) {
+		return { status: 404, contentType: PLAIN, body: '404 未找到 / Not found.' };
+	}
+	const active = raw ? getActiveCapsule(db, resolved.slug, nowMs) : null;
+	if (!active) {
+		return {
+			status: 410,
+			contentType: PLAIN,
+			body: `410 本期已下带,节目码 ${resolved.program} 稍后换新一期 / Off air, new episode soon.`
+		};
+	}
+	bumpViewCount(db, resolved.slug);
+	bumpProgramHits(db, resolved.program.toLowerCase());
+	return { status: 200, contentType: PLAIN, body: buildTextBody(active, nowMs) };
+}
+
+// ---- /view page data ------------------------------------------------------
+
+export type ViewData =
+	| {
+			kind: 'tape';
+			slug: string;
+			title: string | null;
+			content: string | null;
+			active: boolean;
+			createdAt: string;
+			expiresAt: string;
+			url: string;
+			display: string;
+			agentText: string;
+			program: string | null;
+	  }
+	| { kind: 'program-offair'; program: string };
+
+/**
+ * Data for /view/{slug-or-program}. Pure and unit-testable; the route turns null into 404.
+ *
+ * - Direct slug: byte-for-byte legacy behavior — a dead tape still shows its receipt
+ *   (title/dates, content cleared) to whoever holds the slug.
+ * - Via program, live tape: share surfaces (url/display/agentText) use the PROGRAM form,
+ *   which survives weekly swaps; `slug` stays the resolved capsule slug (copy beacon).
+ * - Via program, dead/dangling tape: 'program-offair' carries NOTHING but the program
+ *   name — the dead tape's slug/title/dates must not leak to program-code holders.
+ * - Blocked reads as null (404) on both paths: never signal a takedown.
+ */
+export function loadViewData(
+	db: Database,
+	config: Config,
+	target: string,
+	nowMs: number
+): ViewData | null {
+	const resolved = resolveTarget(db, config, target);
+	if (!resolved) return null;
+
+	const raw = getCapsuleRaw(db, resolved.slug);
+
+	if (resolved.program !== null) {
+		if (raw && isBlocked(raw)) return null;
+		const active = raw ? getActiveCapsule(db, resolved.slug, nowMs) : null;
+		if (!active) return { kind: 'program-offair', program: resolved.program };
+		return tapeViewData(config, active, true, resolved.program, resolved.program);
+	}
+
+	if (!raw || isBlocked(raw)) return null;
+	const active = getActiveCapsule(db, resolved.slug, nowMs);
+	return tapeViewData(config, raw, active !== null, raw.slug, null);
+}
+
+function tapeViewData(
+	config: Config,
+	row: Capsule,
+	active: boolean,
+	shareId: string,
+	program: string | null
+): ViewData {
+	const url = `${config.publicBaseUrl}${config.routePrefix}/${shareId}`;
+	return {
+		kind: 'tape',
+		slug: row.slug,
+		title: row.title,
+		content: active ? row.content : null,
+		active,
+		createdAt: row.created_at,
+		expiresAt: row.expires_at,
+		url,
+		display: url.replace(/^https?:\/\//, ''),
+		agentText: `打开这个链接，按里面的内容执行：${url}`,
+		program
+	};
 }
 
 // ---- copy telemetry -----------------------------------------------------

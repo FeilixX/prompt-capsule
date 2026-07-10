@@ -3,6 +3,7 @@ import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { loadConfig } from '../config';
 import { initSchema } from './capsules';
+import { initProgramsSchema } from './programs';
 
 /** Runtime config, resolved once from the process env. */
 export const config = loadConfig(process.env);
@@ -22,6 +23,7 @@ export function getDb(): Database {
 		next.run('PRAGMA busy_timeout = 5000');
 		next.run('PRAGMA journal_mode = WAL');
 		initSchema(next);
+		initProgramsSchema(next, config);
 		// Publish only after full init succeeds. If anything above throws, `db` stays null and the
 		// next getDb() retries a complete init — never a half-initialized (unmigrated) connection.
 		db = next;

@@ -1,13 +1,16 @@
 import { test, expect } from 'bun:test';
 import { Database } from 'bun:sqlite';
-import { initSchema, getActiveCapsule } from './capsules';
+import { initSchema, getActiveCapsule, getCapsuleRaw, applyModeration } from './capsules';
 import { loadConfig } from '../config';
 import {
 	renderCapsuleText,
+	renderTape,
+	loadViewData,
 	createCapsuleFromInput,
 	deleteCapsuleByToken,
 	recordCopy
 } from './handlers';
+import { initProgramsSchema, upsertProgram, getProgramByLower } from './programs';
 
 const T0 = 1_700_000_000_000;
 const cfg = loadConfig({}); // defaults: n78.xyz, /c, 16384 bytes, 7d
@@ -15,6 +18,8 @@ const cfg = loadConfig({}); // defaults: n78.xyz, /c, 16384 bytes, 7d
 function freshDb(): Database {
 	const db = new Database(':memory:');
 	initSchema(db);
+	// renderTape resolves through the programs table — create it like getDb() does.
+	initProgramsSchema(db, cfg);
 	return db;
 }
 
@@ -148,4 +153,134 @@ test('deleteCapsuleByToken: right token 200, wrong token 403', () => {
 	expect(deleteCapsuleByToken(db, res.slug, 'wrong', T0).status).toBe(403);
 	expect(deleteCapsuleByToken(db, res.slug, res.delete_token, T0).status).toBe(200);
 	expect(renderCapsuleText(db, res.slug, T0).status).toBe(410);
+});
+
+// ---- renderTape (slug OR program code) -------------------------------------
+
+function makeProgram(db: Database, name: string, slug: string) {
+	const out = upsertProgram(db, cfg, name, slug, undefined, T0);
+	if (!out.ok) throw new Error('setup program failed: ' + out.error);
+	return out.program;
+}
+
+test('renderTape: direct slug path is byte-identical to renderCapsuleText', () => {
+	const db = freshDb();
+	const res = make(db, 'direct payload', { title: 't' });
+	// fixed nowMs → identical cache-buster; the only difference would be a semantic drift
+	expect(renderTape(db, cfg, res.slug, T0)).toEqual(renderCapsuleText(db, res.slug, T0));
+	// dead direct slug keeps the terminal 410 (not the program off-air text)
+	const exp = make(db, 'x', { ttl_seconds: 3600 });
+	const dead = renderTape(db, cfg, exp.slug, T0 + 3601_000);
+	expect(dead.status).toBe(410);
+	expect(dead.body).not.toContain('本期已下带');
+});
+
+test('renderTape: unknown target is 404', () => {
+	const db = freshDb();
+	expect(renderTape(db, cfg, 'NOPROG99', T0).status).toBe(404);
+	expect(renderTape(db, cfg, 'missing00', T0).status).toBe(404);
+});
+
+test('renderTape: live program serves the tape and counts view_count AND hits', () => {
+	const db = freshDb();
+	const res = make(db, 'program payload');
+	makeProgram(db, 'CHIBI01', res.slug);
+	const out = renderTape(db, cfg, 'chibi01', T0); // case-insensitive on purpose
+	expect(out.status).toBe(200);
+	expect(out.body).toContain('program payload');
+	expect(getCapsuleRaw(db, res.slug)!.view_count).toBe(1);
+	expect(getProgramByLower(db, 'chibi01')!.hits).toBe(1);
+});
+
+test('renderTape: program with expired tape → off-air 410 naming the program, no hits', () => {
+	const db = freshDb();
+	const res = make(db, 'secret old content', { ttl_seconds: 3600 });
+	makeProgram(db, 'CHIBI01', res.slug);
+	const out = renderTape(db, cfg, 'CHIBI01', T0 + 3601_000);
+	expect(out.status).toBe(410);
+	expect(out.body).toContain('CHIBI01');
+	expect(out.body).toContain('本期已下带');
+	expect(out.body).not.toContain('secret old content');
+	expect(getProgramByLower(db, 'chibi01')!.hits).toBe(0); // hits only on 200
+});
+
+test('renderTape: program with deleted tape → off-air 410 (deliberate kill stays dark)', () => {
+	const db = freshDb();
+	const res = make(db, 'x');
+	makeProgram(db, 'CHIBI01', res.slug);
+	deleteCapsuleByToken(db, res.slug, res.delete_token, T0);
+	const out = renderTape(db, cfg, 'CHIBI01', T0);
+	expect(out.status).toBe(410);
+	expect(out.body).toContain('本期已下带');
+});
+
+test('renderTape: program with blocked tape → the SAME 404 as a direct blocked hit', () => {
+	const db = freshDb();
+	const res = make(db, 'forbidden payload');
+	makeProgram(db, 'CHIBI01', res.slug);
+	applyModeration(db, res.id, 'blocked', 'test', 'test-model', T0);
+	const viaProgram = renderTape(db, cfg, 'CHIBI01', T0);
+	const direct = renderTape(db, cfg, res.slug, T0);
+	expect(viaProgram.status).toBe(404);
+	expect(viaProgram).toEqual(direct); // byte-identical: no takedown signal via the program
+	expect(viaProgram.body).not.toContain('forbidden payload');
+});
+
+test('renderTape: dangling program pointer → defensive off-air 410', () => {
+	const db = freshDb();
+	const res = make(db, 'x');
+	makeProgram(db, 'CHIBI01', res.slug);
+	db.query('DELETE FROM capsules WHERE slug = ?').run(res.slug); // never happens in prod
+	const out = renderTape(db, cfg, 'CHIBI01', T0);
+	expect(out.status).toBe(410);
+	expect(out.body).toContain('本期已下带');
+});
+
+// ---- loadViewData (/view page data) ----------------------------------------
+
+test('loadViewData: off-air shape carries ONLY the program name — no dead-tape metadata', () => {
+	const db = freshDb();
+	const res = make(db, 'secret body', { title: '秘密标题', ttl_seconds: 3600 });
+	makeProgram(db, 'CHIBI01', res.slug);
+	const offair = loadViewData(db, cfg, 'CHIBI01', T0 + 3601_000);
+	// toEqual with the exact literal nails key-set equality: nothing else may leak
+	expect(offair).toEqual({ kind: 'program-offair', program: 'CHIBI01' });
+});
+
+test('loadViewData: live program uses program-form share URLs, resolved slug for the beacon', () => {
+	const db = freshDb();
+	const res = make(db, 'body', { title: 't' });
+	makeProgram(db, 'CHIBI01', res.slug);
+	const view = loadViewData(db, cfg, 'chibi01', T0);
+	expect(view?.kind).toBe('tape');
+	if (view?.kind !== 'tape') return;
+	expect(view.url).toBe('https://n78.xyz/c/CHIBI01');
+	expect(view.display).toBe('n78.xyz/c/CHIBI01');
+	expect(view.agentText).toContain('/c/CHIBI01');
+	expect(view.slug).toBe(res.slug); // copy beacon still hits the real capsule
+	expect(view.program).toBe('CHIBI01');
+	expect(view.active).toBe(true);
+});
+
+test('loadViewData: blocked reads as null (404) via program AND direct', () => {
+	const db = freshDb();
+	const res = make(db, 'forbidden');
+	makeProgram(db, 'CHIBI01', res.slug);
+	applyModeration(db, res.id, 'blocked', 'test', 'test-model', T0);
+	expect(loadViewData(db, cfg, 'CHIBI01', T0)).toBeNull();
+	expect(loadViewData(db, cfg, res.slug, T0)).toBeNull();
+	expect(loadViewData(db, cfg, 'missing00', T0)).toBeNull();
+});
+
+test('loadViewData: direct dead slug keeps its receipt (legacy behavior, holder knows)', () => {
+	const db = freshDb();
+	const res = make(db, 'body', { title: '标题', ttl_seconds: 3600 });
+	const view = loadViewData(db, cfg, res.slug, T0 + 3601_000);
+	expect(view?.kind).toBe('tape');
+	if (view?.kind !== 'tape') return;
+	expect(view.active).toBe(false);
+	expect(view.content).toBeNull(); // content cleared…
+	expect(view.title).toBe('标题'); // …but the receipt (title/dates) stays for the slug holder
+	expect(view.expiresAt).toBe(res.expires_at);
+	expect(view.program).toBeNull();
 });
