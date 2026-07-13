@@ -2,27 +2,33 @@
 	import '../app.css';
 	import favicon from '$lib/assets/favicon.svg';
 	import TapeIcon from '$lib/components/TapeIcon.svelte';
-	import { i18n, t, setLocale, initLocale } from '$lib/i18n.svelte';
+	import { tFor, htmlLang } from '$lib/locale';
 	import { onMount } from 'svelte';
-	import { dev } from '$app/environment';
+	import { dev, browser } from '$app/environment';
+	import { invalidateAll } from '$app/navigation';
 	import { env } from '$env/dynamic/public';
 	import { page } from '$app/state';
 
-	let { children } = $props();
+	let { children, data } = $props();
 	let showPolicy = $state(false);
+
+	// Locale is SSR-derived (root +layout.server.ts). No module-level state — bind `t`
+	// to the current locale so components keep calling t('key') unchanged.
+	const locale = $derived(data.locale);
+	const t = $derived(tFor(locale));
 
 	// --- GEO / social ---
 	const SITE = 'https://n78.xyz';
 	const canonical = $derived(`${SITE}${page.url.pathname}`);
-	const OG_TITLE = '提示词卡带 · Prompt Tape';
-	const OG_DESC =
-		'把一段提示词 / system prompt / 长指令封成一次性 URL，任何 AI agent 直接 fetch 就能照着执行；人也能看。短期有效，带删除口令。';
+	const OG_TITLE = $derived(t('og_title'));
+	const OG_DESC = $derived(t('og_desc'));
 
-	const LD_APP = JSON.stringify({
-		'@context': 'https://schema.org',
-		'@type': 'SoftwareApplication',
-		name: 'Prompt Tape / 提示词卡带',
-		url: SITE,
+	const LD_APP = $derived(
+		JSON.stringify({
+			'@context': 'https://schema.org',
+			'@type': 'SoftwareApplication',
+			name: t('ld_name'),
+			url: SITE,
 		applicationCategory: 'DeveloperApplication',
 		operatingSystem: 'Web',
 		description:
@@ -35,8 +41,9 @@
 			'HTTP API',
 			'Auto-expiry up to 7 days',
 			'Delete key'
-		]
-	});
+			]
+		})
+	);
 	const LD_FAQ = JSON.stringify({
 		'@context': 'https://schema.org',
 		'@type': 'FAQPage',
@@ -86,8 +93,10 @@
 		}
 	})();
 
+	// Keep <html lang> reconciled to the SSR-derived truth. transformPageChunk sets it on a
+	// full document load; after a client-side invalidateAll() this effect re-syncs it.
 	$effect(() => {
-		initLocale();
+		if (browser) document.documentElement.lang = htmlLang(data.locale);
 	});
 
 	onMount(() => {
@@ -110,8 +119,13 @@
 		first?.parentNode?.insertBefore(s, first);
 	});
 
-	function toggleLang() {
-		setLocale(i18n.locale === 'zh' ? 'en' : 'zh');
+	// Switch locale via the SSR source of truth: write the cookie, then invalidateAll() so
+	// the root layout load re-runs and page.data.locale updates everywhere (text + ICP + meta).
+	async function toggleLang() {
+		const next = data.locale === 'zh' ? 'en' : 'zh';
+		document.cookie = `pt_locale=${next};path=/;max-age=31536000;samesite=lax`;
+		document.documentElement.lang = htmlLang(next);
+		await invalidateAll();
 	}
 </script>
 
@@ -121,15 +135,15 @@
 	<link rel="icon" href="/favicon.ico" sizes="any" />
 
 	<meta property="og:type" content="website" />
-	<meta property="og:site_name" content="Prompt Tape / 提示词卡带" />
+	<meta property="og:site_name" content={t('ld_name')} />
 	<meta property="og:title" content={OG_TITLE} />
 	<meta property="og:description" content={OG_DESC} />
 	<meta property="og:url" content={canonical} />
 	<meta property="og:image" content="{SITE}/og.png" />
 	<meta property="og:image:width" content="1200" />
 	<meta property="og:image:height" content="630" />
-	<meta property="og:locale" content="zh_CN" />
-	<meta property="og:locale:alternate" content="en_US" />
+	<meta property="og:locale" content={locale === 'zh' ? 'zh_CN' : 'en_US'} />
+	<meta property="og:locale:alternate" content={locale === 'zh' ? 'en_US' : 'zh_CN'} />
 
 	<meta name="twitter:card" content="summary_large_image" />
 	<meta name="twitter:title" content={OG_TITLE} />
@@ -147,7 +161,7 @@
 		<a class="brand" href="/">
 			<TapeIcon size={34} />
 			<span class="wordmark">
-				<strong>提示词卡带</strong>
+				{#if t('nav_brand')}<strong>{t('nav_brand')}</strong>{/if}
 				<em class="px">PROMPT&nbsp;TAPE</em>
 			</span>
 		</a>
@@ -157,7 +171,7 @@
 			<div class="status px">
 				<span>TEXT/PLAIN</span><i>·</i><span class="ok"><span class="px-dot"></span>AGENT&nbsp;READY</span>
 			</div>
-			<button class="lang-btn px" onclick={toggleLang} aria-label="切换语言 / Switch language">
+			<button class="lang-btn px" onclick={toggleLang} aria-label={t('aria_switch_lang')}>
 				{t('nav_lang')}
 			</button>
 			<a
@@ -181,7 +195,7 @@
 	</header>
 
 	{#if showPolicy}
-		<button class="policy-backdrop" aria-label="关闭" onclick={() => (showPolicy = false)}></button>
+		<button class="policy-backdrop" aria-label={t('aria_close')} onclick={() => (showPolicy = false)}></button>
 		<div class="policy-pop px-panel" role="dialog" aria-label={t('policy_title')}>
 			<strong>{t('policy_title')}</strong>
 			<p>{t('policy_body')}</p>
@@ -199,12 +213,12 @@
 			<span class="sep">text/plain · n78.xyz</span>
 		</div>
 		<p class="disclaimer">{t('disclaimer')}</p>
-		<!-- 备案号仅在运行时由 PUBLIC_ICP_FILING 注入(线上必须显示,合规);源码不含,不上公开仓 -->
-		{#if env.PUBLIC_ICP_FILING}
+		<!-- ICP filing: resolved server-side and gated to locale=zh in +layout.server.ts, so the
+		     Chinese filing value never enters the client public-env blob on EN pages. Compliance:
+		     hiding a filed site's ICP number in EN is a product decision — needs sign-off pre-release. -->
+		{#if data.icp}
 			<p class="icp">
-				<a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer"
-					>{env.PUBLIC_ICP_FILING}</a
-				>
+				<a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer">{data.icp}</a>
 			</p>
 		{/if}
 	</footer>

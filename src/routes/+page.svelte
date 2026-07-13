@@ -1,6 +1,9 @@
 <script lang="ts">
-	import { t } from '$lib/i18n.svelte';
+	import { tFor } from '$lib/locale';
+	import { page } from '$app/state';
 	import { clarityEvent, copyText } from '$lib/client';
+
+	const t = $derived(tFor(page.data.locale));
 
 	interface CreateResponse {
 		slug: string;
@@ -65,7 +68,8 @@
 					content,
 					title: title.trim() || null,
 					ttl_seconds: ttl,
-					source: 'web'
+					source: 'web',
+					lang: page.data.locale
 				})
 			});
 			const data = await res.json();
@@ -142,11 +146,8 @@
 </script>
 
 <svelte:head>
-	<title>提示词卡带 · Prompt Tape</title>
-	<meta
-		name="description"
-		content="把一段长 prompt 录成一张纯文本卡带链接。人一键复制，Codex / Claude 打开就能读取执行。短期有效。"
-	/>
+	<title>{t('title_home')}</title>
+	<meta name="description" content={t('meta_desc')} />
 </svelte:head>
 
 <main class="page">
@@ -154,7 +155,7 @@
 	<section class="hero">
 		<div class="hero-left">
 			<h1 class="wordmark">
-				<span class="l1">提示词卡带 <span class="sl">/</span></span>
+				{#if t('wm_l1')}<span class="l1">{t('wm_l1')} <span class="sl">/</span></span>{/if}
 				<span class="l2 px">PROMPT TAPE</span>
 			</h1>
 			<p class="tagline">{t('tagline_a')}<span class="hl">{t('tagline_hl')}</span>{t('tagline_b')}</p>
@@ -205,7 +206,7 @@
 			<p class="privacy">{t('privacy_a')}{ttlLabel}{t('privacy_valid')}{t('privacy_b')}</p>
 		</div>
 
-		<img class="hero-img" src="/sprites/n78/hero.png" alt="提示词卡带世界：一盘卡带、URL、分享、AI Agent" />
+		<img class="hero-img" src="/sprites/n78/hero.png" alt={t('alt_hero')} />
 	</section>
 
 	<!-- 3 STEPS -->
@@ -255,7 +256,7 @@
 		<div class="sheet">
 			<div class="sheet-head">
 				<span class="t">{headerText}</span>
-				<button class="x" onclick={reset} aria-label="关闭 / Close">✕</button>
+				<button class="x" onclick={reset} aria-label={t('aria_close')}>✕</button>
 			</div>
 
 			{#if deleted}
@@ -274,7 +275,7 @@
 					<img
 						class="m-cassette"
 						src={busy ? '/sprites/tape-spin.png' : '/sprites/tape-still.png'}
-						alt="你的卡带"
+						alt={t('alt_your_tape')}
 					/>
 					<span class="m-url px" class:rec={busy}>{busy ? t('m_url_rec') : display}</span>
 				</div>

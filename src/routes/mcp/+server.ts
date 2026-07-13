@@ -30,11 +30,17 @@ function buildServer(clientIp: string): McpServer {
 		'create_prompt_tape',
 		{
 			description:
-				'把一段提示词/文本封成一次性卡带 URL。content ≤16KB;ttl_seconds ≤604800(7天,缺省7天)。返回 view_url(人看)、raw_url(agent 直接 fetch)、code(卡带编码=slug,下游可只传编码用 read_prompt_tape 取回)、code_share_text(只含编码、无 URL 的分享串,适合小红书等发链接会被降权的平台)、delete_token、expires_at、agent_text。',
+				'Seal a prompt/text into a one-time tape URL. content ≤16KB; ttl_seconds ≤604800 (7 days, default 7 days). Returns view_url (for humans), raw_url (for an agent to fetch), code (the tape code = slug; downstream can pass just the code to read_prompt_tape), code_share_text (a URL-free share line carrying only the code, for platforms that downrank links), delete_token, expires_at, and agent_text.',
 			inputSchema: z.object({
-				content: z.string().describe('要封存的提示词/文本正文'),
+				content: z.string().describe('the prompt/text body to seal'),
 				title: z.string().max(200).optional(),
-				ttl_seconds: z.number().int().positive().max(TAPE_LIMITS.maxTtl).optional()
+				ttl_seconds: z.number().int().positive().max(TAPE_LIMITS.maxTtl).optional(),
+				lang: z
+					.enum(['zh', 'en'])
+					.optional()
+					.describe(
+						'language for the human-facing share strings (share_text/code_share_text); defaults to en. Pass zh only when the user will share on a Chinese platform (e.g. RED).'
+					)
 			})
 		},
 		async (args) => toResult(mcpCreate(deps(), args))
@@ -44,8 +50,8 @@ function buildServer(clientIp: string): McpServer {
 		'read_prompt_tape',
 		{
 			description:
-				'读取一个卡带的正文。target 可以是卡带编码(slug)、节目码(长期栏目别名,大小写不敏感)或完整 URL(/c/… 或 /view/…)。',
-			inputSchema: z.object({ target: z.string().describe('slug 或卡带 URL') })
+				'Read a tape body. target can be a tape code (slug), a program code (a long-lived, case-insensitive alias), or a full URL (/c/… or /view/…).',
+			inputSchema: z.object({ target: z.string().describe('a tape code or a tape URL') })
 		},
 		async (args) => toResult(mcpRead(deps(), args))
 	);
@@ -53,7 +59,7 @@ function buildServer(clientIp: string): McpServer {
 	server.registerTool(
 		'delete_prompt_tape',
 		{
-			description: '用 delete_token 删除一个卡带。',
+			description: 'Delete a tape using its delete_token.',
 			inputSchema: z.object({ slug: z.string(), delete_token: z.string() })
 		},
 		async (args) => toResult(mcpDelete(deps(), args))

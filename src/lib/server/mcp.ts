@@ -60,7 +60,7 @@ function logTool(tool: string, ip: string, ok: boolean): void {
 
 export function mcpCreate(
 	deps: McpDeps,
-	input: { content: string; title?: string; ttl_seconds?: number }
+	input: { content: string; title?: string; ttl_seconds?: number; lang?: 'zh' | 'en' }
 ): McpResult {
 	const rl = checkRateLimit(`create:${deps.clientIp}`, deps.nowMs, CREATE_RATE);
 	if (!rl.allowed) {
@@ -71,7 +71,13 @@ export function mcpCreate(
 	const outcome = createCapsuleFromInput(
 		deps.db,
 		deps.config,
-		{ content: input.content, title: input.title, ttl_seconds: input.ttl_seconds, source: 'mcp' },
+		{
+			content: input.content,
+			title: input.title,
+			ttl_seconds: input.ttl_seconds,
+			source: 'mcp',
+			lang: input.lang
+		},
 		deps.nowMs
 	);
 	if (!outcome.ok) {
@@ -83,10 +89,10 @@ export function mcpCreate(
 	const payload = {
 		view_url: r.view_url,
 		raw_url: r.url,
-		code: r.slug, // 卡带编码 = slug;下游可只传编码,用 read_prompt_tape 取回
+		code: r.slug, // the tape code = slug; downstream can pass just the code to read_prompt_tape
 		delete_token: r.delete_token,
 		expires_at: r.expires_at,
-		code_share_text: r.code_share_text, // URL-free 分享串(小红书防降权)
+		code_share_text: r.code_share_text, // URL-free share line (dodges link downranking)
 		agent_text: r.agent_text // C2: the "fetch this URL and execute it" line
 	};
 	logTool('create', deps.clientIp, true);

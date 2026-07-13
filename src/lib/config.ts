@@ -16,6 +16,8 @@ export interface ModerationConfig {
 	timeoutSec: number; // per DeepSeek request timeout — a hung request must not stall the worker
 }
 
+import { isLocale, type Locale } from './locale';
+
 export interface Config {
 	publicBaseUrl: string;
 	allowedHosts: string[];
@@ -25,6 +27,8 @@ export interface Config {
 	maxTtlSeconds: number;
 	slugLength: number;
 	dbPath: string;
+	/** Locale for audience=human strings when no explicit signal (cookie / Accept-Language / lang arg). */
+	defaultLocale: Locale;
 	/** Bearer token for the operator-only /api/programs* surface. Empty = surface disabled (404). */
 	adminToken: string;
 	moderation: ModerationConfig;
@@ -77,6 +81,10 @@ export function loadConfig(env: Env): Config {
 				'(e.g. `openssl rand -base64 32`) or leave it empty to disable the admin surface.'
 		);
 	}
+	const defaultLocale = str(env, 'DEFAULT_LOCALE', 'en');
+	if (!isLocale(defaultLocale)) {
+		throw new Error(`DEFAULT_LOCALE must be 'zh' or 'en' (got '${defaultLocale}').`);
+	}
 	return {
 		publicBaseUrl: str(env, 'PUBLIC_BASE_URL', 'https://n78.xyz'),
 		allowedHosts: str(env, 'ALLOWED_HOSTS', 'n78.xyz')
@@ -89,6 +97,7 @@ export function loadConfig(env: Env): Config {
 		maxTtlSeconds: num(env, 'MAX_TTL_SECONDS', 604800),
 		slugLength: num(env, 'SLUG_LENGTH', 8),
 		dbPath: str(env, 'DB_PATH', './data/capsules.db'),
+		defaultLocale,
 		adminToken,
 		moderation: {
 			enabled: bool(env, 'MODERATION_ENABLED', false),

@@ -1,7 +1,9 @@
 <script lang="ts">
-	import { t } from '$lib/i18n.svelte';
+	import { tFor } from '$lib/locale';
+	import { page } from '$app/state';
 
-	// 接入 & 使用指南:通用 Skill + 远程 MCP。i18n via t()。
+	// Setup & usage guide: generic Skill + remote MCP. i18n via t() bound to page.data.locale.
+	const t = $derived(tFor(page.data.locale));
 	const MCP_URL = 'https://n78.xyz/mcp';
 	const MCP_CONFIG = `{
   "mcpServers": {
@@ -191,7 +193,7 @@
   <span class="k">"view_url"</span>:        <span class="s">"https://n78.xyz/view/okIdDdhU"</span>,  <span class="c">{t('sk_ex_human')}</span>
   <span class="k">"raw_url"</span>:         <span class="s">"https://n78.xyz/c/okIdDdhU"</span>,     <span class="c">{t('sk_ex_agent')}</span>
   <span class="k">"code"</span>:            <span class="s">"okIdDdhU"</span>,                       <span class="c">{t('sk_ex_code')}</span>
-  <span class="k">"code_share_text"</span>: <span class="s">"…读取提示词卡带 okIdDdhU…"</span>,        <span class="c">{t('sk_ex_share')}</span>
+  <span class="k">"code_share_text"</span>: <span class="s">"…read prompt tape okIdDdhU…"</span>,        <span class="c">{t('sk_ex_share')}</span>
   <span class="k">"delete_token"</span>:    <span class="s">"…"</span>,                            <span class="c">{t('sk_ex_private')}</span>
   <span class="k">"agent_text"</span>:      <span class="s">"… https://n78.xyz/c/okIdDdhU"</span>
 {'}'}

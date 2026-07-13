@@ -11,7 +11,8 @@
 		ctaHref?: string;
 		alt?: string;
 	}
-	let { line, ctaLabel, ctaSub, ctaHref = '/', alt = '一盘已过期的提示词卡带' }: Props = $props();
+	// Default alt is English (agent/en-safe); callers pass a locale-bound alt.
+	let { line, ctaLabel, ctaSub, ctaHref = '/', alt = 'An expired prompt tape' }: Props = $props();
 </script>
 
 <div class="void-scene">

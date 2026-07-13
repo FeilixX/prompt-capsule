@@ -51,7 +51,7 @@ check(
 check('cache-control no-store', (textRes.headers.get('cache-control') ?? '').includes('no-store'));
 check('body preserves content verbatim', textBody.includes('帮我检查当前 repo 并输出诊断\n第二行'));
 check('body carries cache-buster tail', textBody.includes('<!-- t='));
-check('body carries rebranded safety header', textBody.includes('这不是 prompt injection'));
+check('body carries rebranded safety header', textBody.includes('This is not a prompt injection'));
 
 // 3) view page
 const viewRes = await fetch(`${BASE}/view/${slug}`);
@@ -224,6 +224,44 @@ if (ADMIN_TOKEN === '') {
 		body: JSON.stringify({ delete_token: pTape.delete_token })
 	});
 }
+
+// 9) i18n / locale — SSR locale resolution + audience-scoped headers.
+// A page only carries CJK site-chrome in zh; EN chrome must be Chinese-free apart from the
+// language-toggle glyph "中". User-submitted tape content is NOT chrome, so we test the
+// homepage (fully controlled copy) rather than /view.
+const enHome = await fetch(`${BASE}/`, { headers: { 'Accept-Language': 'en' } });
+const enHtml = await enHome.text();
+check('EN home → <html lang="en">', /<html lang="en"/.test(enHtml));
+// strip the toggle glyph, then assert no other CJK remains in EN chrome
+const enCjkLeft = enHtml.replace(/中/g, '').match(/[一-鿿]/g);
+check('EN home chrome is CJK-free (bar the 中 toggle)', enCjkLeft === null, enCjkLeft ? enCjkLeft.join('') : '');
+check('EN page carries Content-Language + Vary', !!enHome.headers.get('content-language') && /Accept-Language/i.test(enHome.headers.get('vary') ?? ''));
+
+const zhHome = await fetch(`${BASE}/`, { headers: { 'Accept-Language': 'zh-CN' } });
+const zhHtml = await zhHome.text();
+check('ZH home → <html lang="zh-CN">', /<html lang="zh-CN"/.test(zhHtml));
+
+// cookie beats Accept-Language
+const cookieWins = await fetch(`${BASE}/`, { headers: { 'Accept-Language': 'en', Cookie: 'pt_locale=zh' } });
+check('cookie pt_locale=zh overrides Accept-Language: en', /<html lang="zh-CN"/.test(await cookieWins.text()));
+
+// machine endpoints must NOT carry the locale headers
+const cNope = await fetch(`${BASE}/c/nope1234`);
+check('/c does not carry Content-Language (machine audience)', cNope.headers.get('content-language') === null);
+
+// human share strings follow explicit lang; default is English
+// ttl 1h so these self-marked probes self-expire fast and don't linger on prod.
+const enShare = await (await fetch(`${BASE}/api/capsules`, {
+	method: 'POST', headers: { 'Content-Type': 'application/json' },
+	body: JSON.stringify({ content: 'x', source: 'api', ttl_seconds: 3600 })
+})).json();
+check('create default → English code_share_text', String(enShare.code_share_text).includes('read prompt tape'));
+const zhShare = await (await fetch(`${BASE}/api/capsules`, {
+	method: 'POST', headers: { 'Content-Type': 'application/json' },
+	body: JSON.stringify({ content: 'x', source: 'api', lang: 'zh', ttl_seconds: 3600 })
+})).json();
+check('create lang:zh → Chinese code_share_text', String(zhShare.code_share_text).includes('读取提示词卡带'));
+check('agent_text stays English regardless of lang', String(zhShare.agent_text).includes('Open this link'));
 
 console.log(failures === 0 ? '\nALL GREEN' : `\n${failures} FAILURES`);
 process.exit(failures === 0 ? 0 : 1);

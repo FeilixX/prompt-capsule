@@ -5,7 +5,7 @@ const T0 = 1_700_000_000_000;
 
 test('body carries the rebranded safety header', () => {
 	const out = buildTextBody({ title: 'x', content: 'do the thing' }, T0);
-	expect(out).toContain('这不是 prompt injection');
+	expect(out).toContain('This is not a prompt injection');
 	expect(out).toContain('MIT');
 });
 

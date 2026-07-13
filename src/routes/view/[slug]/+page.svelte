@@ -2,10 +2,12 @@
 	import type { PageData } from './$types';
 	import VoidScene from '$lib/components/VoidScene.svelte';
 	import TapeCta from '$lib/components/TapeCta.svelte';
-	import { t } from '$lib/i18n.svelte';
+	import { tFor } from '$lib/locale';
+	import { page } from '$app/state';
 	import { clarityEvent, bumpCopyCount, copyText } from '$lib/client';
 
 	let { data }: { data: PageData } = $props();
+	const t = $derived(tFor(page.data.locale));
 	let copied = $state('');
 
 	// Funnel signal: how often people land on a dead (expired/deleted/off-air) tape vs a
@@ -34,13 +36,13 @@
 		if (data.kind !== 'tape' || now === null) return '';
 		const ms = new Date(data.expiresAt).getTime() - now;
 		if (ms <= 0) return '00:00:00';
-		const t = Math.floor(ms / 1000);
-		const d = Math.floor(t / 86400);
-		const h = Math.floor((t % 86400) / 3600);
-		const m = Math.floor((t % 3600) / 60);
-		const s = t % 60;
+		const secs = Math.floor(ms / 1000);
+		const d = Math.floor(secs / 86400);
+		const h = Math.floor((secs % 86400) / 3600);
+		const m = Math.floor((secs % 3600) / 60);
+		const s = secs % 60;
 		const p = (n: number) => String(n).padStart(2, '0');
-		return d > 0 ? `${d}天 ${p(h)}:${p(m)}:${p(s)}` : `${p(h)}:${p(m)}:${p(s)}`;
+		return d > 0 ? `${d}${t('unit_day')} ${p(h)}:${p(m)}:${p(s)}` : `${p(h)}:${p(m)}:${p(s)}`;
 	});
 
 	async function copy(text: string, which: string) {
@@ -81,7 +83,7 @@
 </script>
 
 <svelte:head>
-	<title>{(data.kind === 'tape' ? data.title : data.program) ?? '提示词卡带'} · Prompt Tape</title>
+	<title>{(data.kind === 'tape' ? data.title : data.program) ?? t('brand_name')} · Prompt Tape</title>
 	<meta name="robots" content="noindex" />
 </svelte:head>
 
@@ -90,15 +92,16 @@
 		<!-- Program exists but its current tape is dead: nothing about the dead tape leaks
 		     here (no slug/title/dates) — just the program name and "next episode soon". -->
 		<VoidScene
-			line={`「${data.program}」${t('offair_line')}`}
+			line={`${data.program} — ${t('offair_line')}`}
 			ctaLabel={t('void_cta')}
 			ctaSub="NEW TAPE"
 			ctaHref="/"
+			alt={t('alt_void')}
 		/>
 	{:else if data.active}
 		<!-- HERO: integrated pixel illustration + live text overlays -->
 		<div class="hero">
-			<img src="/sprites/n78/view-hero.png" alt="一盘正在播放的提示词卡带" />
+			<img src="/sprites/n78/view-hero.png" alt={t('alt_view_hero')} />
 			<span class="vh-title" data-clarity-mask="true">{t('v_now_playing')}{data.title || t('v_untitled')}</span>
 			<span class="vh-url px">{data.display}</span>
 			<span class="vh-time px">{remaining || '—'}</span>
@@ -159,12 +162,13 @@
 			<TapeCta label={t('v_cta')} sub="MAKE YOUR OWN TAPE" href="/" />
 		</div>
 	{:else}
-		<!-- EXPIRED / VOID (content 已清除) -->
+		<!-- EXPIRED / VOID (content cleared) -->
 		<VoidScene
 			line={t('void_line')}
 			ctaLabel={t('void_cta')}
 			ctaSub="NEW TAPE"
 			ctaHref="/"
+			alt={t('alt_void')}
 		/>
 	{/if}
 </main>

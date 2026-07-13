@@ -14,6 +14,8 @@ import {
 } from './capsules';
 import { buildTextBody } from './body';
 import { resolveTarget, bumpProgramHits } from './programs';
+import { AGENT_TEXT, NOT_FOUND, GONE, OFFAIR, SHARE } from './i18n';
+import { isLocale } from '../locale';
 
 const PLAIN = 'text/plain; charset=utf-8';
 
@@ -24,7 +26,9 @@ const createSchema = z.object({
 	title: z.string().max(200).nullish(),
 	ttl_seconds: z.number().int().positive().optional(),
 	source: z.enum(['web', 'cli', 'mcp', 'api']).default('web'),
-	has_callback: z.boolean().optional()
+	has_callback: z.boolean().optional(),
+	// Locale for the human-facing share strings only. agent_text stays English.
+	lang: z.enum(['zh', 'en']).optional()
 });
 
 export interface CreateResponse {
@@ -79,6 +83,9 @@ export function createCapsuleFromInput(
 	// display: protocol-stripped for the human-facing share headline (short, non-spammy).
 	// agent_text keeps the full URL (scheme included) — a machine consumer needs a directly-fetchable URL.
 	const display = url.replace(/^https?:\/\//, '');
+	// Human share strings follow the caller's explicit lang (default en). agent_text is
+	// consumed by an agent, so it stays English regardless.
+	const locale = isLocale(input.lang) ? input.lang : config.defaultLocale;
 
 	return {
 		ok: true,
@@ -89,9 +96,9 @@ export function createCapsuleFromInput(
 			view_url: viewUrl,
 			expires_at: capsule.expires_at,
 			delete_token: deleteToken,
-			share_text: `提示词卡带: ${display}`,
-			code_share_text: `提示词卡带编码：${capsule.slug}（让你的 AI 说「读取提示词卡带 ${capsule.slug}」即可取回并执行）`,
-			agent_text: `打开这个链接，按里面的内容执行：${url}`
+			share_text: SHARE.share_text(display, locale),
+			code_share_text: SHARE.code_share_text(capsule.slug, locale),
+			agent_text: AGENT_TEXT(url)
 		}
 	};
 }
@@ -107,16 +114,16 @@ export interface TextResult {
 export function renderCapsuleText(db: Database, slug: string, nowMs: number): TextResult {
 	const raw = getCapsuleRaw(db, slug);
 	if (!raw) {
-		return { status: 404, contentType: PLAIN, body: '404 未找到 / Not found.' };
+		return { status: 404, contentType: PLAIN, body: NOT_FOUND };
 	}
 	// A moderation-blocked capsule reads as 404 (never-existed), not 410 (gone) —
 	// don't signal to a bad actor that the slug was live and got taken down.
 	if (isBlocked(raw)) {
-		return { status: 404, contentType: PLAIN, body: '404 未找到 / Not found.' };
+		return { status: 404, contentType: PLAIN, body: NOT_FOUND };
 	}
 	const active = getActiveCapsule(db, slug, nowMs);
 	if (!active) {
-		return { status: 410, contentType: PLAIN, body: '410 已过期或已删除 / Gone.' };
+		return { status: 410, contentType: PLAIN, body: GONE };
 	}
 	bumpViewCount(db, slug);
 	return { status: 200, contentType: PLAIN, body: buildTextBody(active, nowMs) };
@@ -138,21 +145,21 @@ export function renderCapsuleText(db: Database, slug: string, nowMs: number): Te
 export function renderTape(db: Database, config: Config, target: string, nowMs: number): TextResult {
 	const resolved = resolveTarget(db, config, target);
 	if (!resolved) {
-		return { status: 404, contentType: PLAIN, body: '404 未找到 / Not found.' };
+		return { status: 404, contentType: PLAIN, body: NOT_FOUND };
 	}
 	if (resolved.program === null) {
 		return renderCapsuleText(db, resolved.slug, nowMs);
 	}
 	const raw = getCapsuleRaw(db, resolved.slug);
 	if (raw && isBlocked(raw)) {
-		return { status: 404, contentType: PLAIN, body: '404 未找到 / Not found.' };
+		return { status: 404, contentType: PLAIN, body: NOT_FOUND };
 	}
 	const active = raw ? getActiveCapsule(db, resolved.slug, nowMs) : null;
 	if (!active) {
 		return {
 			status: 410,
 			contentType: PLAIN,
-			body: `410 本期已下带,节目码 ${resolved.program} 稍后换新一期 / Off air, new episode soon.`
+			body: OFFAIR(resolved.program)
 		};
 	}
 	bumpViewCount(db, resolved.slug);
@@ -230,7 +237,7 @@ function tapeViewData(
 		expiresAt: row.expires_at,
 		url,
 		display: url.replace(/^https?:\/\//, ''),
-		agentText: `打开这个链接，按里面的内容执行：${url}`,
+		agentText: AGENT_TEXT(url),
 		program
 	};
 }

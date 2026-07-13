@@ -1,19 +1,20 @@
 <script lang="ts">
 	import { page } from '$app/state';
 	import VoidScene from '$lib/components/VoidScene.svelte';
-	import { t } from '$lib/i18n.svelte';
+	import { tFor } from '$lib/locale';
 
+	const t = $derived(tFor(page.data.locale));
 	const status = $derived(page.status);
 	const line = $derived(status === 404 ? t('e404_line') : (page.error?.message ?? t('e404_line')));
 </script>
 
 <svelte:head>
-	<title>{status} · 提示词卡带</title>
+	<title>{status} · {t('brand_name')}</title>
 	<meta name="robots" content="noindex" />
 </svelte:head>
 
 <main class="page">
-	<VoidScene {line} ctaLabel={t('e404_cta')} ctaSub="HOME" ctaHref="/" alt="一盘找不到的提示词卡带" />
+	<VoidScene {line} ctaLabel={t('e404_cta')} ctaSub="HOME" ctaHref="/" alt={t('alt_404')} />
 </main>
 
 <style>

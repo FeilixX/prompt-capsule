@@ -37,6 +37,14 @@ test('mcpCreate returns urls + delete_token + agent_text', () => {
 	expect(JSON.parse(r.content[0].text).raw_url).toBe(out.raw_url);
 });
 
+test('mcpCreate defaults share strings to English; lang:zh switches them', () => {
+	const en = mcpCreate(deps(), { content: 'hello' }).structuredContent as Record<string, string>;
+	expect(en.code_share_text).toContain('read prompt tape');
+	const zh = mcpCreate(deps(), { content: 'hello', lang: 'zh' })
+		.structuredContent as Record<string, string>;
+	expect(zh.code_share_text).toContain('读取提示词卡带');
+});
+
 test('mcpCreate empty content -> structured empty error', () => {
 	const r = mcpCreate(deps(), { content: '   ' });
 	expect(r.isError).toBe(true);
@@ -126,5 +134,5 @@ test('mcpRead: program whose tape expired → gone with off-air text', () => {
 	const r = mcpRead(deps('1.1.1.1', 1500 + 60_000), { target: 'CHIBI02' });
 	expect(r.isError).toBe(true);
 	expect((r.structuredContent as any).error.code).toBe('gone');
-	expect((r.structuredContent as any).error.message).toContain('本期已下带');
+	expect((r.structuredContent as any).error.message).toContain('Off air');
 });

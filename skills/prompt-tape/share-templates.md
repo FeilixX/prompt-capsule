@@ -27,3 +27,28 @@
 用法:跟你的 AI(装了 prompt-tape skill / MCP)说一句「读取提示词卡带 {code} 并执行」就行,它会自己取回正文照着做。
 还没装的,主页搜 prompt-tape skill;{expires_at} 前有效,过期自动失效。
 (编码是公开分享用的;delete_token 千万别发出去。)
+
+---
+
+# Share templates (English)
+
+Use when posting / forwarding a tape on X, Reddit, Discord, etc. Placeholders in {}. Never put delete_token in a public post.
+
+## Template A: share one prompt
+I've used this prompt for a month — sealed it into a tape so you can just grab it.
+Open the link for the full text, copy it into your own AI:
+{view_url}
+Expires {expires_at}, save it soon if you want it.
+
+## Template B: a workflow / long instruction
+My whole instruction set for {use case}, packed into one link:
+{view_url}
+Hand it straight to your agent and let it run.
+
+## Template C: code only (no link)
+Some platforms downrank posts with links, so this version has **no link** — just the code. Use the `code_share_text` from create, or:
+{one line on what the prompt does}.
+Prompt Tape code: {code}
+How to use: tell your AI (with the prompt-tape skill / MCP) "read prompt tape {code} and run it" — it fetches the body and follows it.
+Don't have it yet? Search for the prompt-tape skill. Valid until {expires_at}, then it auto-expires.
+(The code is for public sharing; never post the delete_token.)

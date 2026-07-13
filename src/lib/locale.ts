@@ -1,60 +1,89 @@
-import { browser } from '$app/environment';
+// Locale core — pure TS, no runes, shared by server (hooks / handlers) and client
+// (components). Locale is SSR-derived: the server resolves it once per request and
+// threads it through page.data; components bind `t` to page.data.locale. There is NO
+// module-level locale state (that would leak across requests on the server).
 
 export type Locale = 'zh' | 'en';
 
-/** Reactive UI language. Server always renders zh (never mutated server-side, so
- *  no cross-request leak); the client picks it up from localStorage / navigator. */
-export const i18n = $state<{ locale: Locale }>({ locale: 'zh' });
-
-function applyLang(l: Locale) {
-	if (browser) document.documentElement.lang = l === 'zh' ? 'zh-CN' : 'en';
+export function isLocale(x: unknown): x is Locale {
+	return x === 'zh' || x === 'en';
 }
 
-export function setLocale(l: Locale) {
-	i18n.locale = l;
-	if (browser) {
-		try {
-			localStorage.setItem('pt_locale', l);
-		} catch {
-			/* private mode — ignore */
-		}
-		applyLang(l);
-	}
+/** `<html lang>` / Content-Language value for a locale. */
+export function htmlLang(l: Locale): string {
+	return l === 'zh' ? 'zh-CN' : 'en';
 }
 
-export function initLocale() {
-	if (!browser) return;
-	try {
-		const saved = localStorage.getItem('pt_locale');
-		if (saved === 'en' || saved === 'zh') {
-			i18n.locale = saved;
-			applyLang(saved);
-			return;
-		}
-	} catch {
-		/* ignore */
+/**
+ * Pick a supported locale from an Accept-Language header by q-weight.
+ * Ignores q=0 entries, honors ordering, returns null when nothing supported
+ * matches (so the caller falls back). `*` yields null (defer to fallback).
+ */
+export function parseAcceptLanguage(header: string | null | undefined): Locale | null {
+	if (!header) return null;
+	const items = header
+		.split(',')
+		.map((part) => {
+			const [tag, ...params] = part.trim().split(';');
+			const q = params.find((p) => p.trim().startsWith('q='));
+			const w = q ? Number(q.split('=')[1]) : 1;
+			return { tag: tag.trim().toLowerCase(), q: Number.isFinite(w) ? w : 0 };
+		})
+		.filter((i) => i.q > 0)
+		.sort((a, b) => b.q - a.q);
+	for (const { tag } of items) {
+		if (tag === '*') return null;
+		if (tag.startsWith('zh')) return 'zh';
+		if (tag.startsWith('en')) return 'en';
 	}
-	const nav = (navigator.language || '').toLowerCase();
-	i18n.locale = nav.startsWith('zh') ? 'zh' : 'en';
-	applyLang(i18n.locale);
+	return null;
+}
+
+/** Priority: explicit cookie > Accept-Language > fallback. */
+export function resolveLocale(o: {
+	cookie?: string | null;
+	accept?: string | null;
+	fallback: Locale;
+}): Locale {
+	if (isLocale(o.cookie)) return o.cookie;
+	return parseAcceptLanguage(o.accept) ?? o.fallback;
 }
 
 type Dict = Record<string, string>;
 
 // Copy is deliberately human: short, plain, a little punk. No "赋能 / 多重防护 /
 // 即取即用 / robust / seamless". A founder wrote this, not a model.
-const ZH: Dict = {
+const ZH = {
 	// nav / chrome
 	nav_rules: '内容须知',
 	nav_lang: 'EN',
 	nav_source: '源码在 GitHub',
+	nav_brand: '提示词卡带',
+	brand_name: '提示词卡带',
 	policy_title: '内容须知',
 	policy_body:
 		'别录违法、侵权、色情、暴力、赌博、诈骗、仇恨或用来害人的东西。发现一律删，情节严重的报给相关部门。你录的、你分享的，责任你自己担。',
 	policy_ok: '知道了',
+	aria_close: '关闭',
+	aria_switch_lang: '切换语言 / Switch language',
 	foot_copyright: '© 2026 提示词卡带 · text/plain · n78.xyz',
 	disclaimer:
 		'卡带都是用户自己录的，跟本站立场无关。这是临时存储，随时可能失效或被删，不保证一直在。别放密码、密钥、隐私或违法内容 —— 出了事你自己担。',
+
+	// GEO / social / meta
+	title_home: '提示词卡带 · Prompt Tape',
+	og_title: '提示词卡带 · Prompt Tape',
+	og_desc:
+		'把一段提示词 / system prompt / 长指令封成一次性 URL，任何 AI agent 直接 fetch 就能照着执行；人也能看。短期有效，带删除口令。',
+	meta_desc:
+		'把一段长 prompt 录成一张纯文本卡带链接。人一键复制，Codex / Claude 打开就能读取执行。短期有效。',
+	ld_name: 'Prompt Tape / 提示词卡带',
+	alt_hero: '提示词卡带世界：一盘卡带、URL、分享、AI Agent',
+	alt_your_tape: '你的卡带',
+	alt_view_hero: '一盘正在播放的提示词卡带',
+	alt_404: '一盘找不到的提示词卡带',
+	alt_void: '一盘已过期的提示词卡带',
+	unit_day: '天',
 
 	// home hero
 	wm_l1: '提示词卡带',
@@ -223,19 +252,37 @@ const ZH: Dict = {
 	sk_lim5_b: '公开匿名',
 	sk_lim5: '：没有账户、没有登录。卡带临时、公开、可 fetch。',
 	sk_cta: '去建一个卡带'
-};
+} satisfies Dict;
 
-const EN: Dict = {
+const EN = {
 	nav_rules: 'House rules',
 	nav_lang: '中',
 	nav_source: 'Source on GitHub',
+	nav_brand: '',
+	brand_name: 'Prompt Tape',
 	policy_title: 'House rules',
 	policy_body:
 		"Don't seal anything illegal, stolen, sexual, violent, hateful, or built to scam or hurt people. We delete violations on sight and report the serious ones. What you record and share is on you.",
 	policy_ok: 'Got it',
+	aria_close: 'Close',
+	aria_switch_lang: 'Switch language',
 	foot_copyright: '© 2026 Prompt Tape · text/plain · n78.xyz',
 	disclaimer:
 		"Tapes are recorded by users, not us. Storage is temporary and can disappear or be deleted anytime — no uptime promised. Keep passwords, keys, and private stuff out. Whatever goes wrong is on you.",
+
+	title_home: 'Prompt Tape',
+	og_title: 'Prompt Tape',
+	og_desc:
+		'Seal a prompt, system prompt, or long instruction into a one-time URL any AI agent can fetch and run; humans can read it too. Short-lived, with a delete key.',
+	meta_desc:
+		'Record a long prompt into one plain-text tape link. People copy it in one tap; Codex / Claude open it and run. Short-lived.',
+	ld_name: 'Prompt Tape',
+	alt_hero: 'Prompt Tape world: a tape, a URL, sharing, an AI agent',
+	alt_your_tape: 'Your tape',
+	alt_view_hero: 'A prompt tape now playing',
+	alt_404: 'A prompt tape that cannot be found',
+	alt_void: 'An expired prompt tape',
+	unit_day: 'd',
 
 	wm_l1: '',
 	tagline_a: 'One long prompt, ',
@@ -396,11 +443,22 @@ const EN: Dict = {
 	sk_lim5_b: 'Public and anonymous',
 	sk_lim5: ': no accounts, no login. Tapes are temporary, public, fetchable.',
 	sk_cta: 'Go make a tape'
-};
+} satisfies Dict;
+
+export type DictKey = keyof typeof ZH;
 
 const DICTS: Record<Locale, Dict> = { zh: ZH, en: EN };
 
-/** Look up a copy string for the current locale (falls back to zh, then the key). */
-export function t(key: keyof typeof ZH): string {
-	return DICTS[i18n.locale][key] ?? ZH[key] ?? (key as string);
+/**
+ * Look up a copy string for a locale (falls back to en, then the key). `locale` is
+ * typed but defended at runtime: on some error-page paths page.data.locale can be
+ * absent, and an unguarded DICTS[undefined] would throw instead of degrading to en.
+ */
+export function t(key: DictKey, locale: Locale): string {
+	return (DICTS[locale] ?? EN)[key] ?? EN[key] ?? (key as string);
+}
+
+/** Bind `t` to a locale so components keep calling `t('key')` unchanged. */
+export function tFor(locale: Locale): (key: DictKey) => string {
+	return (key) => t(key, locale);
 }

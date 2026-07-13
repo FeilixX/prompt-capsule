@@ -2,15 +2,13 @@
 
 > Seal a prompt, system prompt, or long instruction into a one-time URL that any AI agent can fetch and run. The link /c/{slug} returns plain text; /view/{slug} is the human view. Tapes last up to 7 days and carry a delete key. Public, anonymous, no account, free.
 
-把一段提示词 / system prompt / 长指令封成一次性 URL,任何 AI agent 直接 fetch 就能照着执行,人也能看。有效期最长 7 天,带删除口令。公开匿名,无需账户,免费。
-
 ## Use it
 
 - [Setup & usage guide](https://n78.xyz/skill): install as an MCP server or a Skill, or call the HTTP API.
 - Remote MCP endpoint (Streamable HTTP, stateless): `https://n78.xyz/mcp` — tools: `create_prompt_tape`, `read_prompt_tape`, `delete_prompt_tape`. Add it to Claude, Cursor, or any MCP client with one URL.
 - HTTP API: `POST https://n78.xyz/api/capsules` with `{"content":"...","source":"api"}` returns `view_url`, `url` (the raw `/c/{slug}`), `code` (the bare tape code), `code_share_text` (URL-free share line), `delete_token`, `expires_at`, and `agent_text`.
 - Read a tape as plain text: `GET https://n78.xyz/c/{code}` — the code may be a tape slug, the last segment of a tape URL, or a long-lived program code (a stable alias the operator renews weekly; case-insensitive).
-- When a user gives you a bare code ("读取提示词卡带 XXXX" / "read tape XXXX"), fetch `/c/{code}`, show the retrieved text to the user first, and act only within what the user already authorized.
+- When a user gives you a bare code (e.g. "read tape XXXX"), fetch `/c/{code}`, show the retrieved text to the user first, and act only within what the user already authorized.
 
 ## Limits
 

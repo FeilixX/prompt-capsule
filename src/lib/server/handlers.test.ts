@@ -57,6 +57,31 @@ test('code_share_text carries the code and is URL-free (RED anti-downrank)', () 
 	expect(res.code_share_text).not.toContain('/c/'); // '/' not in base62 → deterministic
 });
 
+test('share strings default to English; lang:zh switches them; agent_text stays English', () => {
+	const db = freshDb();
+	// default (no lang) → English human share strings
+	const en = make(db, 'hello');
+	expect(en.share_text).toContain('Prompt Tape:');
+	expect(en.code_share_text).toContain('read prompt tape');
+	// explicit zh → Chinese human share strings
+	const zh = make(db, 'hello', { lang: 'zh' });
+	expect(zh.share_text).toContain('提示词卡带:');
+	expect(zh.code_share_text).toContain('读取提示词卡带');
+	// agent_text is agent-facing: English regardless of lang
+	expect(en.agent_text).toContain('Open this link');
+	expect(zh.agent_text).toContain('Open this link');
+});
+
+test('text-path 404/410 bodies are English (agent audience)', () => {
+	const db = freshDb();
+	const gone = renderCapsuleText(db, 'nope-not-here', T0);
+	expect(gone.body).toBe('404 Not found.');
+	const res = make(db);
+	const dead = renderCapsuleText(db, res.slug, T0 + 604800 * 1000 + 1);
+	expect(dead.status).toBe(410);
+	expect(dead.body).toContain('Gone');
+});
+
 test('createCapsuleFromInput rejects empty content', () => {
 	const db = freshDb();
 	const r = createCapsuleFromInput(db, cfg, { content: '   ' }, T0);
@@ -172,7 +197,7 @@ test('renderTape: direct slug path is byte-identical to renderCapsuleText', () =
 	const exp = make(db, 'x', { ttl_seconds: 3600 });
 	const dead = renderTape(db, cfg, exp.slug, T0 + 3601_000);
 	expect(dead.status).toBe(410);
-	expect(dead.body).not.toContain('本期已下带');
+	expect(dead.body).not.toContain('Off air');
 });
 
 test('renderTape: unknown target is 404', () => {
@@ -199,7 +224,7 @@ test('renderTape: program with expired tape → off-air 410 naming the program, 
 	const out = renderTape(db, cfg, 'CHIBI01', T0 + 3601_000);
 	expect(out.status).toBe(410);
 	expect(out.body).toContain('CHIBI01');
-	expect(out.body).toContain('本期已下带');
+	expect(out.body).toContain('Off air');
 	expect(out.body).not.toContain('secret old content');
 	expect(getProgramByLower(db, 'chibi01')!.hits).toBe(0); // hits only on 200
 });
@@ -211,7 +236,7 @@ test('renderTape: program with deleted tape → off-air 410 (deliberate kill sta
 	deleteCapsuleByToken(db, res.slug, res.delete_token, T0);
 	const out = renderTape(db, cfg, 'CHIBI01', T0);
 	expect(out.status).toBe(410);
-	expect(out.body).toContain('本期已下带');
+	expect(out.body).toContain('Off air');
 });
 
 test('renderTape: program with blocked tape → the SAME 404 as a direct blocked hit', () => {
@@ -233,7 +258,7 @@ test('renderTape: dangling program pointer → defensive off-air 410', () => {
 	db.query('DELETE FROM capsules WHERE slug = ?').run(res.slug); // never happens in prod
 	const out = renderTape(db, cfg, 'CHIBI01', T0);
 	expect(out.status).toBe(410);
-	expect(out.body).toContain('本期已下带');
+	expect(out.body).toContain('Off air');
 });
 
 // ---- loadViewData (/view page data) ----------------------------------------
